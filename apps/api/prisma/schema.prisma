@@ -1,0 +1,339 @@
+// SyncRoute — Enterprise Carpooling Platform
+// Owner: Riya (Database & Data Integrity lane)
+//
+// PostGIS geography columns are declared as Unsupported() so `prisma migrate`
+// creates them, but they are read/written through $queryRaw in the geo
+// repository — Prisma Client cannot project them. That split is deliberate:
+// CRUD via Prisma, geospatial via SQL we can show the judges.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [postgis]
+}
+
+enum Role {
+  admin
+  employee
+}
+
+enum VehicleStatus {
+  pending
+  approved
+  inactive
+}
+
+enum RideStatus {
+  published
+  started
+  completed
+  cancelled
+}
+
+enum BookingStatus {
+  booked
+  cancelled
+  completed
+}
+
+// PS §5.4 trip lifecycle, verbatim.
+enum TripStatus {
+  booked
+  started
+  in_progress
+  completed
+  payment_pending
+  payment_completed
+}
+
+enum LedgerType {
+  recharge
+  trip_payment
+  trip_earning
+  refund
+}
+
+enum PaymentMethod {
+  cash
+  card
+  upi
+  wallet
+}
+
+enum PaymentStatus {
+  pending
+  success
+  failed
+}
+
+enum SafetyEventKind {
+  route_deviation
+  sos
+}
+
+model Organization {
+  id                 String   @id @default(uuid())
+  name               String
+  code               String   @unique
+  city               String   @default("Ahmedabad")
+  registeredAddress  String?  @map("registered_address")
+  industry           String?
+  adminContact       String?  @map("admin_contact")
+  // Admin-configurable, drives the fare suggestion (mockup: Settings tab).
+  fuelCostPerLitre   Decimal  @default(96.50) @map("fuel_cost_per_litre") @db.Decimal(8, 2)
+  defaultMileageKmpl Decimal  @default(18.0) @map("default_mileage_kmpl") @db.Decimal(5, 2)
+  costPerKm          Decimal  @default(8.00) @map("cost_per_km") @db.Decimal(8, 2)
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  users               User[]
+  vehicles            Vehicle[]
+  rides               Ride[]
+  bookings            Booking[]
+  walletTransactions  WalletTransaction[]
+
+  @@map("organizations")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  orgId        String   @map("org_id")
+  role         Role     @default(employee)
+  name         String
+  email        String
+  phone        String
+  passwordHash String   @map("password_hash")
+  photoUrl     String?  @map("photo_url")
+  department   String?
+  manager      String?
+  location     String?
+  // Admin "Platform Access" grant/revoke on the Employees tab.
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  org                Organization        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  vehicles           Vehicle[]
+  savedPlaces        SavedPlace[]
+  ridesAsDriver      Ride[]
+  bookings           Booking[]
+  messages           Message[]
+  walletTransactions WalletTransaction[]
+  refreshTokens      RefreshToken[]
+
+  // Email is unique per organization, not globally — two orgs may both
+  // employ a raj.patel@ on their own domain.
+  @@unique([orgId, email])
+  @@index([orgId])
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  tokenHash String   @unique @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model Vehicle {
+  id              String        @id @default(uuid())
+  orgId           String        @map("org_id")
+  ownerId         String        @map("owner_id")
+  model           String
+  registrationNo  String        @unique @map("registration_no")
+  seatingCapacity Int           @map("seating_capacity")
+  mileageKmpl     Decimal?      @map("mileage_kmpl") @db.Decimal(5, 2)
+  color           String?
+  // Mockup Vehicles tab: admin approves before the vehicle can carry rides.
+  status          VehicleStatus @default(pending)
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  owner User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  rides Ride[]
+
+  @@index([orgId])
+  @@index([ownerId])
+  @@map("vehicles")
+}
+
+model SavedPlace {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  label     String
+  placeName String   @map("place_name")
+  lat       Decimal  @db.Decimal(10, 7)
+  lng       Decimal  @db.Decimal(10, 7)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("saved_places")
+}
+
+model Ride {
+  id          String  @id @default(uuid())
+  orgId       String  @map("org_id")
+  driverId    String  @map("driver_id")
+  vehicleId   String  @map("vehicle_id")
+  originLabel String  @map("origin_label")
+  destLabel   String  @map("dest_label")
+
+  // PostGIS — written and read via $queryRaw only.
+  originPt  Unsupported("geography(Point, 4326)")      @map("origin_pt")
+  destPt    Unsupported("geography(Point, 4326)")      @map("dest_pt")
+  // The driver's actual road route. Corridor matching lives on this column.
+  routeGeom Unsupported("geography(LineString, 4326)")? @map("route_geom")
+
+  routeDistanceM  Int?       @map("route_distance_m")
+  routeDurationS  Int?       @map("route_duration_s")
+  departureAt     DateTime   @map("departure_at")
+  seatsTotal      Int        @map("seats_total")
+  seatsAvailable  Int        @map("seats_available")
+  farePerSeat     Decimal    @map("fare_per_seat") @db.Decimal(8, 2)
+  // Stored as a rule only ("MO,TU,WE,TH,FR"); instances are not generated.
+  recurrenceRule  String?    @map("recurrence_rule")
+  status          RideStatus @default(published)
+  createdAt       DateTime   @default(now()) @map("created_at")
+
+  org      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  driver   User         @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  vehicle  Vehicle      @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  bookings Booking[]
+  trip     Trip?
+
+  @@index([orgId, departureAt])
+  @@index([driverId])
+  @@map("rides")
+}
+
+model Booking {
+  id          String        @id @default(uuid())
+  orgId       String        @map("org_id")
+  rideId      String        @map("ride_id")
+  passengerId String        @map("passenger_id")
+  seats       Int           @default(1)
+  pickupLabel String        @map("pickup_label")
+  dropLabel   String        @map("drop_label")
+  pickupPt    Unsupported("geography(Point, 4326)") @map("pickup_pt")
+  dropPt      Unsupported("geography(Point, 4326)") @map("drop_pt")
+  fareTotal   Decimal       @map("fare_total") @db.Decimal(8, 2)
+  status      BookingStatus @default(booked)
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  ride      Ride         @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  passenger User         @relation(fields: [passengerId], references: [id], onDelete: Cascade)
+  payments  Payment[]
+
+  // One passenger cannot double-book the same ride.
+  @@unique([rideId, passengerId])
+  @@index([passengerId])
+  @@map("bookings")
+}
+
+model Trip {
+  id          String     @id @default(uuid())
+  rideId      String     @unique @map("ride_id")
+  status      TripStatus @default(booked)
+  startedAt   DateTime?  @map("started_at")
+  completedAt DateTime?  @map("completed_at")
+  createdAt   DateTime   @default(now()) @map("created_at")
+
+  ride         Ride           @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  locations    TripLocation[]
+  messages     Message[]
+  safetyEvents SafetyEvent[]
+
+  @@map("trips")
+}
+
+// Append-only GPS ping log. Never updated.
+model TripLocation {
+  id         String   @id @default(uuid())
+  tripId     String   @map("trip_id")
+  pt         Unsupported("geography(Point, 4326)")
+  speed      Decimal? @db.Decimal(6, 2)
+  recordedAt DateTime @default(now()) @map("recorded_at")
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId, recordedAt])
+  @@map("trip_locations")
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  tripId    String   @map("trip_id")
+  senderId  String   @map("sender_id")
+  body      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  trip   Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  sender User @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([tripId, createdAt])
+  @@map("messages")
+}
+
+// Append-only double-entry ledger. There is deliberately NO balance column:
+// balance = SUM(amount) per user. A mutable balance is a race waiting to happen.
+model WalletTransaction {
+  id             String     @id @default(uuid())
+  orgId          String     @map("org_id")
+  userId         String     @map("user_id")
+  // Signed: positive credits the user, negative debits.
+  amount         Decimal    @db.Decimal(10, 2)
+  type           LedgerType
+  tripId         String?    @map("trip_id")
+  // Blocks double-processing of a gateway callback replayed twice.
+  idempotencyKey String     @unique @map("idempotency_key")
+  note           String?
+  createdAt      DateTime   @default(now()) @map("created_at")
+
+  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("wallet_transactions")
+}
+
+model Payment {
+  id         String        @id @default(uuid())
+  bookingId  String        @map("booking_id")
+  method     PaymentMethod
+  amount     Decimal       @db.Decimal(8, 2)
+  status     PaymentStatus @default(pending)
+  gatewayRef String?       @map("gateway_ref")
+  createdAt  DateTime      @default(now()) @map("created_at")
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+  @@map("payments")
+}
+
+model SafetyEvent {
+  id        String          @id @default(uuid())
+  tripId    String          @map("trip_id")
+  kind      SafetyEventKind
+  pt        Unsupported("geography(Point, 4326)")?
+  detail    String?
+  createdAt DateTime        @default(now()) @map("created_at")
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId])
+  @@map("safety_events")
+}
