@@ -1,5 +1,12 @@
 import type { RequestHandler } from 'express';
-import type { ZodSchema } from 'zod';
+import type { ZodType, ZodTypeDef } from 'zod';
+
+/**
+ * Schemas that transform (recurrence day-array -> "MO,TU", phone stripping)
+ * have an input type that differs from their output, so both are generic
+ * here. Pinning only one collapses the pair and rejects those schemas.
+ */
+type AnySchema<Out> = ZodType<Out, ZodTypeDef, unknown>;
 
 /**
  * Parse-and-replace: the handler downstream sees only validated, coerced,
@@ -7,7 +14,7 @@ import type { ZodSchema } from 'zod';
  * cannot smuggle extra fields (org_id, role, status) into a create call.
  */
 export const validateBody =
-  <T>(schema: ZodSchema<T>): RequestHandler =>
+  <T>(schema: AnySchema<T>): RequestHandler =>
   (req, _res, next) => {
     const result = schema.safeParse(req.body);
     if (!result.success) return next(result.error);
@@ -16,7 +23,7 @@ export const validateBody =
   };
 
 export const validateQuery =
-  <T>(schema: ZodSchema<T>): RequestHandler =>
+  <T>(schema: AnySchema<T>): RequestHandler =>
   (req, _res, next) => {
     const result = schema.safeParse(req.query);
     if (!result.success) return next(result.error);
@@ -26,7 +33,7 @@ export const validateQuery =
   };
 
 export const validateParams =
-  <T>(schema: ZodSchema<T>): RequestHandler =>
+  <T>(schema: AnySchema<T>): RequestHandler =>
   (req, _res, next) => {
     const result = schema.safeParse(req.params);
     if (!result.success) return next(result.error);

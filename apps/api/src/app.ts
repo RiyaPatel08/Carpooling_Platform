@@ -3,6 +3,9 @@ import cors from 'cors';
 import { errorHandler, notFoundHandler } from './middleware/error.js';
 import { authRoutes, meRoutes } from './routes/auth.routes.js';
 import { geoRoutes } from './routes/geo.routes.js';
+import { vehicleRoutes } from './routes/vehicle.routes.js';
+import { rideRoutes, bookingRoutes } from './routes/ride.routes.js';
+import { tripRoutes } from './routes/trip.routes.js';
 
 export function createApp() {
   const app = express();
@@ -25,6 +28,10 @@ export function createApp() {
   app.use('/auth', authRoutes);
   app.use('/me', meRoutes);
   app.use('/geo', geoRoutes);
+  app.use('/vehicles', vehicleRoutes);
+  app.use('/rides', rideRoutes);
+  app.use('/bookings', bookingRoutes);
+  app.use('/trips', tripRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
