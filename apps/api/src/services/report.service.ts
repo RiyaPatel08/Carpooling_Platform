@@ -22,7 +22,7 @@ interface Window {
 function windowClause(w: Window) {
   return {
     from: w.from ?? new Date(0),
-    to: w.to ?? new Date(8_640_000_000_000_000),
+    to: w.to ?? new Date('2100-01-01T00:00:00.000Z'),
   };
 }
 
@@ -50,7 +50,7 @@ export async function summary(orgId: string, w: Window = {}): Promise<ReportSumm
       JOIN vehicles v      ON v.id = r.vehicle_id
       JOIN organizations o ON o.id = r.org_id
       LEFT JOIN bookings b ON b.ride_id = r.id
-      WHERE r.org_id = ${orgId}::uuid
+      WHERE r.org_id = ${orgId}
         AND t.status IN ('completed', 'payment_pending', 'payment_completed')
         AND t.completed_at BETWEEN ${from} AND ${to}
       GROUP BY r.id, r.route_distance_m, r.seats_total, v.mileage_kmpl,
@@ -69,7 +69,7 @@ export async function summary(orgId: string, w: Window = {}): Promise<ReportSumm
   `;
 
   const r = rows[0];
-  const totalDistanceKm = (r.total_distance_m ?? 0) / 1000;
+  const totalDistanceKm = Number(r.total_distance_m ?? 0) / 1000;
   const totalFuelCost = Number(r.total_fuel_cost ?? 0);
   const totalPassengerKm = Number(r.total_passenger_km ?? 0);
   const seatsOffered = Number(r.seats_offered ?? 0);
@@ -122,13 +122,13 @@ export async function byVehicle(orgId: string, w: Window = {}): Promise<VehicleR
     LEFT JOIN trips t    ON t.ride_id = r.id
                         AND t.status IN ('completed', 'payment_pending', 'payment_completed')
                         AND t.completed_at BETWEEN ${from} AND ${to}
-    WHERE v.org_id = ${orgId}::uuid
+    WHERE v.org_id = ${orgId}
     GROUP BY v.id, v.model, v.registration_no, u.name
     ORDER BY SUM(r.route_distance_m) DESC NULLS LAST
   `;
 
   return rows.map((v) => {
-    const distanceKm = (v.distance_m ?? 0) / 1000;
+    const distanceKm = Number(v.distance_m ?? 0) / 1000;
     const fuelCost = Number(v.fuel_cost ?? 0);
     return {
       vehicleId: v.vehicle_id,
@@ -168,7 +168,7 @@ export async function monthly(orgId: string, months = 6): Promise<MonthlyReport>
     JOIN vehicles v      ON v.id = r.vehicle_id
     JOIN organizations o ON o.id = r.org_id
     LEFT JOIN bookings b ON b.ride_id = r.id AND b.status = 'completed'
-    WHERE r.org_id = ${orgId}::uuid
+    WHERE r.org_id = ${orgId}
       AND t.status IN ('completed', 'payment_pending', 'payment_completed')
       AND t.completed_at > NOW() - (${months} || ' months')::interval
     GROUP BY 1

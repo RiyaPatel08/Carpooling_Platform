@@ -1,0 +1,3 @@
+id,booking_id,method,amount,status,gateway_ref,created_at
+bad40b25-3d35-4f5f-8db1-ed8e6728262a,69b78aac-2fcc-4e37-9c5d-b9b212ea4b97,upi,120.00,success,,2026-07-18 13:09:30.598
+0750f0c7-41f6-4e15-850b-b4db07fce6b9,a817c75f-ece2-4296-b4aa-85b9771ccaa2,wallet,10.00,success,,2026-07-18 13:24:11.928

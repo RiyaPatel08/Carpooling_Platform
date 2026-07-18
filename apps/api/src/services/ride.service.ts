@@ -53,7 +53,7 @@ export async function publish(
       departure_at, seats_total, seats_available,
       fare_per_seat, recurrence_rule, status, created_at
     ) VALUES (
-      gen_random_uuid(), ${orgId}::uuid, ${driverId}::uuid, ${input.vehicleId}::uuid,
+      gen_random_uuid()::text, ${orgId}, ${driverId}, ${input.vehicleId},
       ${input.origin.label}, ${input.destination.label},
       ST_GeogFromText(${pointWkt(input.origin.lat, input.origin.lng)}),
       ST_GeogFromText(${pointWkt(input.destination.lat, input.destination.lng)}),
@@ -195,11 +195,11 @@ async function baselineSearch(
     FROM rides r
     JOIN users u    ON u.id = r.driver_id
     JOIN vehicles v ON v.id = r.vehicle_id
-    WHERE r.org_id = ${orgId}::uuid
+    WHERE r.org_id = ${orgId}
       AND r.status = 'published'
       AND r.seats_available >= ${q.seats}
       AND r.departure_at BETWEEN ${from} AND ${to}
-      AND r.driver_id <> ${userId}::uuid
+      AND r.driver_id <> ${userId}
     ORDER BY r.departure_at ASC, r.fare_per_seat ASC
     LIMIT 50
   `;
@@ -253,11 +253,11 @@ async function corridorSearch(
     CROSS JOIN passenger p
     JOIN users u    ON u.id = r.driver_id
     JOIN vehicles v ON v.id = r.vehicle_id
-    WHERE r.org_id = ${orgId}::uuid
+    WHERE r.org_id = ${orgId}
       AND r.status = 'published'
       AND r.seats_available >= ${q.seats}
       AND r.departure_at BETWEEN ${from} AND ${to}
-      AND r.driver_id <> ${userId}::uuid
+      AND r.driver_id <> ${userId}
       AND r.route_geom IS NOT NULL
       -- Step 1: both ends near the driver's actual road corridor (GiST).
       AND ST_DWithin(r.route_geom, p.pickup_pt, ${radius})
@@ -336,7 +336,7 @@ export async function getRouteGeometry(rideId: string, orgId: string) {
   const rows = await prisma.$queryRaw<{ geojson: string }[]>`
     SELECT ST_AsGeoJSON(route_geom::geometry) AS geojson
     FROM rides
-    WHERE id = ${rideId}::uuid AND org_id = ${orgId}::uuid
+    WHERE id = ${rideId} AND org_id = ${orgId}
   `;
   if (!rows.length || !rows[0].geojson) throw notFound('Route not found for that ride');
   return JSON.parse(rows[0].geojson) as { type: 'LineString'; coordinates: [number, number][] };

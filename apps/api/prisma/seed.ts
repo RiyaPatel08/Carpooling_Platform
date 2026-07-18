@@ -10,6 +10,7 @@
  *
  *   pnpm --filter @syncroute/api seed
  */
+import 'dotenv/config';
 import { PrismaClient, Prisma } from '@prisma/client';
 import argon2 from 'argon2';
 
@@ -262,7 +263,7 @@ async function main() {
         departure_at, seats_total, seats_available, fare_per_seat,
         recurrence_rule, status, created_at
       ) VALUES (
-        gen_random_uuid(), ${opts.orgId}::uuid, ${opts.driverId}::uuid, ${opts.vehicleId}::uuid,
+        gen_random_uuid()::text, ${opts.orgId}, ${opts.driverId}, ${opts.vehicleId},
         ${opts.from.label}, ${opts.to.label},
         ST_GeogFromText(${pointWkt(opts.from.lat, opts.from.lng)}),
         ST_GeogFromText(${pointWkt(opts.to.lat, opts.to.lng)}),

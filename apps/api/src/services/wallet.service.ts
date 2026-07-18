@@ -15,7 +15,7 @@ import { config, razorpayEnabled } from '../config.js';
  */
 export async function balance(userId: string, client: Tx = prisma): Promise<number> {
   const rows = await client.$queryRaw<{ total: Prisma.Decimal | null }[]>`
-    SELECT SUM(amount) AS total FROM wallet_transactions WHERE user_id = ${userId}::uuid
+    SELECT SUM(amount) AS total FROM wallet_transactions WHERE user_id = ${userId}
   `;
   return Number(rows[0]?.total ?? 0);
 }

@@ -179,7 +179,7 @@ adminRoutes.get(
       JOIN trips t  ON t.id = se.trip_id
       JOIN rides r  ON r.id = t.ride_id
       JOIN users u  ON u.id = r.driver_id
-      WHERE r.org_id = ${auth(req).orgId}::uuid
+      WHERE r.org_id = ${auth(req).orgId}
       ORDER BY se.created_at DESC
       LIMIT 100
     `;

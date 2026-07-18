@@ -1,0 +1,6 @@
+id,org_id,owner_id,model,registration_no,seating_capacity,mileage_kmpl,color,status,created_at
+7022dac1-df2a-418d-ac68-887f90436a66,d49d2654-1fd2-4cfd-881a-42fe43f6f5df,bf884427-4d9d-4ab3-b853-51a08437d783,Swift Dzire,GJ01AB1234,4,18.00,White,approved,2026-07-18 12:03:02.253
+d6b524e1-a21b-49cd-a5ba-1ba6c37f41d1,d49d2654-1fd2-4cfd-881a-42fe43f6f5df,e530e3cd-048a-4c2f-a675-a52fe9ac128d,Alto 800,GJ01AB5034,4,22.00,Silver,approved,2026-07-18 12:03:02.258
+375583d3-2ce6-4fce-ad1a-1b134ee669d3,4c520537-bdd2-472f-99c7-f3243f6cf22a,64b2cfc3-04d7-4fbe-9f1f-68b6625a1bf7,Hyundai i20,GJ05XY9090,5,17.00,Blue,approved,2026-07-18 12:03:02.263
+665d4663-3647-47ed-a379-c35ef511966b,d49d2654-1fd2-4cfd-881a-42fe43f6f5df,77ff7473-8d8b-4e28-bc04-316094257e05,Swift creat,GJ01RJ5421,4,,,approved,2026-07-18 13:01:36.725
+67be161e-fb47-4ca0-8104-a9151babdf06,d49d2654-1fd2-4cfd-881a-42fe43f6f5df,2ab409a2-6e3d-49a3-895d-6b2c0bd31604,Innova Crysta,GJ01CD7788,7,12.00,Grey,approved,2026-07-18 12:03:02.261

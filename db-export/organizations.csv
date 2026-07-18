@@ -1,0 +1,3 @@
+id,name,code,city,registered_address,industry,admin_contact,fuel_cost_per_litre,default_mileage_kmpl,cost_per_km,created_at
+d49d2654-1fd2-4cfd-881a-42fe43f6f5df,Odoo Pvt. Ltd.,ODOO,Gandhinagar,"Gandhinagar, Gujarat",Software,admin@odoo.com,96.50,18.00,8.00,2026-07-18 12:03:02.221
+4c520537-bdd2-472f-99c7-f3243f6cf22a,InfoBridge Systems,INFOBRIDGE,Ahmedabad,"Ahmedabad, Gujarat",IT Services,admin@infobridge.demo,94.00,16.00,7.50,2026-07-18 12:03:02.228

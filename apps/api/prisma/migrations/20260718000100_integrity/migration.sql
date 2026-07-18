@@ -123,8 +123,8 @@ CREATE TRIGGER trg_trip_locations_append_only
 CREATE OR REPLACE FUNCTION enforce_ride_org_consistency()
 RETURNS TRIGGER AS $$
 DECLARE
-    driver_org  UUID;
-    vehicle_org UUID;
+    driver_org  TEXT;
+    vehicle_org TEXT;
     veh_status  TEXT;
 BEGIN
     SELECT org_id INTO driver_org FROM users WHERE id = NEW.driver_id;
@@ -158,9 +158,9 @@ CREATE TRIGGER trg_ride_org_consistency
 CREATE OR REPLACE FUNCTION enforce_booking_rules()
 RETURNS TRIGGER AS $$
 DECLARE
-    passenger_org UUID;
-    ride_org      UUID;
-    ride_driver   UUID;
+    passenger_org TEXT;
+    ride_org      TEXT;
+    ride_driver   TEXT;
 BEGIN
     SELECT org_id INTO passenger_org FROM users WHERE id = NEW.passenger_id;
     SELECT org_id, driver_id INTO ride_org, ride_driver FROM rides WHERE id = NEW.ride_id;

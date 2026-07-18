@@ -47,7 +47,7 @@ export async function recordPing(input: LocationUpdate): Promise<PingResult> {
     ),
     ins AS (
       INSERT INTO trip_locations (id, trip_id, pt, speed, recorded_at)
-      SELECT gen_random_uuid(), ${input.tripId}::uuid, ping.pt, ${input.speed ?? null}, ${recordedAt}
+      SELECT gen_random_uuid()::text, ${input.tripId}, ping.pt, ${input.speed ?? null}, ${recordedAt}
       FROM ping
       RETURNING trip_id
     )
@@ -60,7 +60,7 @@ export async function recordPing(input: LocationUpdate): Promise<PingResult> {
         * ST_Length(r.route_geom) AS remaining_m
     FROM rides r
     CROSS JOIN ping
-    WHERE r.id = ${trip.ride.id}::uuid AND r.route_geom IS NOT NULL
+    WHERE r.id = ${trip.ride.id} AND r.route_geom IS NOT NULL
   `;
 
   const offRouteM = rows[0]?.off_route_m ?? null;
@@ -127,7 +127,7 @@ async function evaluateDeviation(
   const rows = await prisma.$queryRaw<{ id: string; created_at: Date }[]>`
     INSERT INTO safety_events (id, trip_id, kind, pt, detail, created_at)
     VALUES (
-      gen_random_uuid(), ${tripId}::uuid, 'route_deviation',
+      gen_random_uuid()::text, ${tripId}, 'route_deviation',
       ST_GeogFromText(${pointWkt(input.lat, input.lng)}), ${detail}, NOW()
     )
     RETURNING id, created_at
@@ -156,14 +156,14 @@ export async function recordSos(
     ? await prisma.$queryRaw<{ id: string; created_at: Date }[]>`
         INSERT INTO safety_events (id, trip_id, kind, pt, detail, created_at)
         VALUES (
-          gen_random_uuid(), ${input.tripId}::uuid, 'sos',
+          gen_random_uuid()::text, ${input.tripId}, 'sos',
           ST_GeogFromText(${pointWkt(input.lat!, input.lng!)}), ${detail}, NOW()
         )
         RETURNING id, created_at
       `
     : await prisma.$queryRaw<{ id: string; created_at: Date }[]>`
         INSERT INTO safety_events (id, trip_id, kind, detail, created_at)
-        VALUES (gen_random_uuid(), ${input.tripId}::uuid, 'sos', ${detail}, NOW())
+        VALUES (gen_random_uuid()::text, ${input.tripId}, 'sos', ${detail}, NOW())
         RETURNING id, created_at
       `;
 
@@ -182,7 +182,7 @@ export async function trackHistory(tripId: string) {
   return prisma.$queryRaw<{ lat: number; lng: number; speed: number | null; recorded_at: Date }[]>`
     SELECT ST_Y(pt::geometry) AS lat, ST_X(pt::geometry) AS lng, speed, recorded_at
     FROM trip_locations
-    WHERE trip_id = ${tripId}::uuid
+    WHERE trip_id = ${tripId}
     ORDER BY recorded_at ASC
   `;
 }

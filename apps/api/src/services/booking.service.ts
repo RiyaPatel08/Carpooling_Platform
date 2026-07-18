@@ -40,7 +40,7 @@ export async function create(
       >`
         SELECT id, org_id, driver_id, seats_available, fare_per_seat, status, departure_at
         FROM rides
-        WHERE id = ${rideId}::uuid
+        WHERE id = ${rideId}
         FOR UPDATE
       `;
 
@@ -84,7 +84,7 @@ export async function create(
       await tx.$executeRaw`
         UPDATE rides
         SET seats_available = seats_available - ${input.seats}
-        WHERE id = ${rideId}::uuid
+        WHERE id = ${rideId}
       `;
 
       // Re-booking after a cancellation reuses the row, since
@@ -100,7 +100,7 @@ export async function create(
               drop_pt   = ST_GeogFromText(${pointWkt(input.drop.lat, input.drop.lng)}),
               fare_total = ${new Prisma.Decimal(fareTotal)},
               created_at = NOW()
-          WHERE id = ${existing.id}::uuid
+          WHERE id = ${existing.id}
         `;
         return {
           id: existing.id,
@@ -115,7 +115,7 @@ export async function create(
           pickup_label, drop_label, pickup_pt, drop_pt,
           fare_total, status, created_at
         ) VALUES (
-          gen_random_uuid(), ${orgId}::uuid, ${rideId}::uuid, ${passengerId}::uuid, ${input.seats},
+          gen_random_uuid()::text, ${orgId}, ${rideId}, ${passengerId}, ${input.seats},
           ${input.pickup.label}, ${input.drop.label},
           ST_GeogFromText(${pointWkt(input.pickup.lat, input.pickup.lng)}),
           ST_GeogFromText(${pointWkt(input.drop.lat, input.drop.lng)}),
@@ -169,14 +169,14 @@ export async function cancel(
       throw conflict('This trip has already started and can no longer be cancelled');
     }
 
-    await tx.$queryRaw`SELECT id FROM rides WHERE id = ${booking.rideId}::uuid FOR UPDATE`;
+    await tx.$queryRaw`SELECT id FROM rides WHERE id = ${booking.rideId} FOR UPDATE`;
 
     await tx.booking.update({ where: { id: bookingId }, data: { status: 'cancelled' } });
 
     const updated = await tx.$queryRaw<{ seats_available: number }[]>`
       UPDATE rides
       SET seats_available = LEAST(seats_available + ${booking.seats}, seats_total)
-      WHERE id = ${booking.rideId}::uuid
+      WHERE id = ${booking.rideId}
       RETURNING seats_available
     `;
 
