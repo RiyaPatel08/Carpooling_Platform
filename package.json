@@ -1,0 +1,17 @@
+{
+  "name": "syncroute",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Enterprise Carpooling Platform — Odoo x KSV Hackathon 2026",
+  "scripts": {
+    "db:up": "docker compose up -d db",
+    "db:down": "docker compose down",
+    "api": "pnpm --filter @syncroute/api dev",
+    "admin": "pnpm --filter @syncroute/admin dev",
+    "mobile": "pnpm --filter @syncroute/mobile start"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@10.7.0"
+}

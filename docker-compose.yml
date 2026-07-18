@@ -1,0 +1,32 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: syncroute-db
+    environment:
+      POSTGRES_USER: syncroute
+      POSTGRES_PASSWORD: syncroute
+      POSTGRES_DB: syncroute
+    ports:
+      - '5433:5432'
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U syncroute']
+      interval: 5s
+      retries: 10
+
+  # Self-hosted routing. Not started by default — the API talks to
+  # routing.openstreetmap.de until OSRM_URL is pointed here.
+  # Prepare data first:  ./scripts/osrm-prepare.sh
+  osrm:
+    image: ghcr.io/project-osrm/osrm-backend
+    container_name: syncroute-osrm
+    profiles: ['osrm']
+    command: osrm-routed --algorithm mld /data/region.osrm
+    volumes:
+      - ./osrm-data:/data
+    ports:
+      - '5000:5000'
+
+volumes:
+  db-data:
