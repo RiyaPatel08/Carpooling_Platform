@@ -26,6 +26,24 @@ export async function create(
 ): Promise<{ id: string; fareTotal: number; seatsRemaining: number }> {
   return prisma.$transaction(
     async (tx) => {
+      // Block if the passenger already has an active booking on an ongoing ride.
+      const activeBooking = await tx.booking.findFirst({
+        where: {
+          passengerId,
+          status: 'booked',
+          ride: { status: { in: ['published', 'started'] } },
+        },
+        select: { id: true },
+      });
+      if (activeBooking) throw conflict('You already have an active ride booking. Complete or cancel it before booking another.');
+
+      // Block if the passenger is also a driver with an active ride.
+      const activeDriverRide = await tx.ride.findFirst({
+        where: { driverId: passengerId, status: { in: ['published', 'started'] } },
+        select: { id: true },
+      });
+      if (activeDriverRide) throw conflict('You have an active ride as a driver. Complete or cancel it before booking as a passenger.');
+
       // FOR UPDATE: serialises concurrent bookings on this ride.
       const locked = await tx.$queryRaw<
         {

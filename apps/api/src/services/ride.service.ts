@@ -20,6 +20,13 @@ export async function publish(
   orgId: string,
   input: RideCreateInput,
 ): Promise<{ id: string }> {
+  // Block if the driver already has an active (published / started) ride.
+  const activeRide = await prisma.ride.findFirst({
+    where: { driverId, status: { in: ['published', 'started'] } },
+    select: { id: true },
+  });
+  if (activeRide) throw conflict('You already have an active ride. Complete or cancel it before offering another.');
+
   const vehicle = await prisma.vehicle.findUnique({ where: { id: input.vehicleId } });
   if (!vehicle) throw notFound('Vehicle not found');
   if (vehicle.ownerId !== driverId) throw forbidden('You can only offer rides in your own vehicle');
