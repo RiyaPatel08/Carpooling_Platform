@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "SyncRoute",
+    "slug": "syncroute",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "scheme": "syncroute",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#1F6F5C"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "SyncRoute shares your live location with your carpool while a trip is active.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "SyncRoute shares your live location with your carpool while a trip is active."
+      }
+    },
+    "android": {
+      "package": "com.syncroute.app",
+      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"]
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "SyncRoute shares your live location with your carpool while a trip is active."
+        }
+      ]
+    ]
+  }
+}
