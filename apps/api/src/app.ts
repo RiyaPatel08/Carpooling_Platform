@@ -6,6 +6,8 @@ import { geoRoutes } from './routes/geo.routes.js';
 import { vehicleRoutes } from './routes/vehicle.routes.js';
 import { rideRoutes, bookingRoutes } from './routes/ride.routes.js';
 import { tripRoutes } from './routes/trip.routes.js';
+import { adminRoutes } from './routes/admin.routes.js';
+import { reportRoutes } from './routes/report.routes.js';
 
 export function createApp() {
   const app = express();
@@ -32,6 +34,8 @@ export function createApp() {
   app.use('/rides', rideRoutes);
   app.use('/bookings', bookingRoutes);
   app.use('/trips', tripRoutes);
+  app.use('/admin', adminRoutes);
+  app.use('/reports', reportRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

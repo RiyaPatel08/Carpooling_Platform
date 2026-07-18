@@ -1,0 +1,581 @@
+{
+  "info": {
+    "name": "SyncRoute — Enterprise Carpooling Platform",
+    "description": "Frozen REST contract. Run the folders top to bottom: Auth captures the tokens into collection variables, so every later request is already authenticated.\n\nThe Demo Flow folder walks the exact judged path: publish → search (with detour) → book → start → complete → pay.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:4000" },
+    { "key": "accessToken", "value": "" },
+    { "key": "refreshToken", "value": "" },
+    { "key": "driverToken", "value": "" },
+    { "key": "adminToken", "value": "" },
+    { "key": "vehicleId", "value": "" },
+    { "key": "rideId", "value": "" },
+    { "key": "bookingId", "value": "" },
+    { "key": "tripId", "value": "" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login — passenger (Priya)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const b = pm.response.json();",
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('returns tokens', () => pm.expect(b.accessToken).to.be.a('string'));",
+                  "pm.collectionVariables.set('accessToken', b.accessToken);",
+                  "pm.collectionVariables.set('refreshToken', b.refreshToken);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": { "type": "noauth" },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"priya.nair@odoo.com\",\n  \"password\": \"demo1234\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+          }
+        },
+        {
+          "name": "Login — driver (Raj)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const b = pm.response.json();",
+                  "pm.collectionVariables.set('driverToken', b.accessToken);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": { "type": "noauth" },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"raj.patel@odoo.com\",\n  \"password\": \"demo1234\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+          }
+        },
+        {
+          "name": "Login — admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const b = pm.response.json();",
+                  "pm.collectionVariables.set('adminToken', b.accessToken);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": { "type": "noauth" },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@odoo.com\",\n  \"password\": \"demo1234\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+          }
+        },
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "noauth" },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orgCode\": \"ODOO\",\n  \"name\": \"New Employee\",\n  \"email\": \"new.employee@odoo.com\",\n  \"phone\": \"9876500099\",\n  \"password\": \"demo1234\",\n  \"confirmPassword\": \"demo1234\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/register", "host": ["{{baseUrl}}"], "path": ["auth", "register"] }
+          }
+        },
+        {
+          "name": "Refresh",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "noauth" },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/auth/refresh", "host": ["{{baseUrl}}"], "path": ["auth", "refresh"] }
+          }
+        },
+        {
+          "name": "Get profile",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/me", "host": ["{{baseUrl}}"], "path": ["me"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Validation & Security (negative cases)",
+      "description": "These are the requests that prove the guarantees. Every one should FAIL, with a readable message.",
+      "item": [
+        {
+          "name": "Invalid email → per-field message",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('400', () => pm.response.to.have.status(400));",
+                  "const b = pm.response.json();",
+                  "pm.test('names the offending field', () => pm.expect(b.error.fields.email).to.be.a('string'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": { "type": "noauth" },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"not-an-email\",\n  \"password\": \"\"\n}" },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+          }
+        },
+        {
+          "name": "Revoked employee cannot sign in",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('403 forbidden', () => pm.response.to.have.status(403));"],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": { "type": "noauth" },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"sameer.rana@odoo.com\",\n  \"password\": \"demo1234\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+          }
+        },
+        {
+          "name": "No token → 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('401', () => pm.response.to.have.status(401));"],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "auth": { "type": "noauth" },
+            "url": { "raw": "{{baseUrl}}/vehicles", "host": ["{{baseUrl}}"], "path": ["vehicles"] }
+          }
+        },
+        {
+          "name": "Employee hitting an admin route → 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('403', () => pm.response.to.have.status(403));"],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/admin/employees", "host": ["{{baseUrl}}"], "path": ["admin", "employees"] }
+          }
+        },
+        {
+          "name": "Bad registration number → rejected",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"model\": \"Swift\",\n  \"registrationNo\": \"NOT-A-PLATE\",\n  \"seatingCapacity\": 4\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/vehicles", "host": ["{{baseUrl}}"], "path": ["vehicles"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Vehicles",
+      "item": [
+        {
+          "name": "My vehicles",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/vehicles", "host": ["{{baseUrl}}"], "path": ["vehicles"] }
+          }
+        },
+        {
+          "name": "Register a vehicle",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const b = pm.response.json();",
+                  "pm.collectionVariables.set('vehicleId', b.id);",
+                  "pm.test('starts pending approval', () => pm.expect(b.status).to.eql('pending'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"model\": \"Honda City\",\n  \"registrationNo\": \"GJ01ZZ4321\",\n  \"seatingCapacity\": 5,\n  \"mileageKmpl\": 17.5,\n  \"color\": \"Black\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/vehicles", "host": ["{{baseUrl}}"], "path": ["vehicles"] }
+          }
+        },
+        {
+          "name": "Admin approves it",
+          "request": {
+            "method": "PUT",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminToken}}" }] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"approved\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/admin/vehicles/{{vehicleId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "vehicles", "{{vehicleId}}", "status"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Geo",
+      "item": [
+        {
+          "name": "Route ISKCON → Infocity",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/geo/route?fromLat=23.0301&fromLng=72.5074&toLat=23.1877&toLng=72.6369",
+              "host": ["{{baseUrl}}"],
+              "path": ["geo", "route"],
+              "query": [
+                { "key": "fromLat", "value": "23.0301" },
+                { "key": "fromLng", "value": "72.5074" },
+                { "key": "toLat", "value": "23.1877" },
+                { "key": "toLng", "value": "72.6369" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Autocomplete",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/geo/autocomplete?q=Infocity",
+              "host": ["{{baseUrl}}"],
+              "path": ["geo", "autocomplete"],
+              "query": [{ "key": "q", "value": "Infocity" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Demo Flow",
+      "description": "The judged path, in order.",
+      "item": [
+        {
+          "name": "1. Driver publishes a ride",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const b = pm.response.json();",
+                  "pm.collectionVariables.set('rideId', b.id);",
+                  "pm.test('201 created', () => pm.response.to.have.status(201));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{driverToken}}" }] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vehicleId\": \"PUT_AN_APPROVED_VEHICLE_ID_HERE\",\n  \"origin\": { \"label\": \"ISKCON Temple, Ahmedabad\", \"lat\": 23.0301, \"lng\": 72.5074 },\n  \"destination\": { \"label\": \"Infocity, Gandhinagar\", \"lat\": 23.1877, \"lng\": 72.6369 },\n  \"departureAt\": \"2026-07-19T19:00:00.000Z\",\n  \"seatsTotal\": 3,\n  \"farePerSeat\": 120\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/rides", "host": ["{{baseUrl}}"], "path": ["rides"] }
+          }
+        },
+        {
+          "name": "2. Passenger searches mid-corridor (shows +X min detour)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const b = pm.response.json();",
+                  "pm.test('returns matches', () => pm.expect(b).to.be.an('array'));",
+                  "if (b.length) {",
+                  "  pm.test('carries a detour figure', () => pm.expect(b[0]).to.have.property('detourMinutes'));",
+                  "  console.log('Top match detour:', b[0].detourMinutes, 'min');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "description": "Pickup is Gota, partway along the driver's route — not either endpoint. Endpoint-matching would return nothing here.",
+            "url": {
+              "raw": "{{baseUrl}}/rides/search?fromLat=23.1050&fromLng=72.5450&toLat=23.1877&toLng=72.6369&seats=1&windowHours=6",
+              "host": ["{{baseUrl}}"],
+              "path": ["rides", "search"],
+              "query": [
+                { "key": "fromLat", "value": "23.1050" },
+                { "key": "fromLng", "value": "72.5450" },
+                { "key": "toLat", "value": "23.1877" },
+                { "key": "toLng", "value": "72.6369" },
+                { "key": "seats", "value": "1" },
+                { "key": "windowHours", "value": "6" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "3. Book a seat",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const b = pm.response.json();",
+                  "pm.collectionVariables.set('bookingId', b.id);",
+                  "pm.test('seat count decremented', () => pm.expect(b.seatsRemaining).to.be.a('number'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"seats\": 1,\n  \"pickup\": { \"label\": \"Gota Circle\", \"lat\": 23.1050, \"lng\": 72.5450 },\n  \"drop\": { \"label\": \"Infocity, Gandhinagar\", \"lat\": 23.1877, \"lng\": 72.6369 }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/rides/{{rideId}}/book",
+              "host": ["{{baseUrl}}"],
+              "path": ["rides", "{{rideId}}", "book"]
+            }
+          }
+        },
+        {
+          "name": "4. My trips (captures tripId)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const b = pm.response.json();",
+                  "const t = b.find(x => x.rideId === pm.collectionVariables.get('rideId'));",
+                  "if (t && t.tripId) pm.collectionVariables.set('tripId', t.tripId);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/trips/mine", "host": ["{{baseUrl}}"], "path": ["trips", "mine"] }
+          }
+        },
+        {
+          "name": "5. Driver starts the trip",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{driverToken}}" }] },
+            "url": {
+              "raw": "{{baseUrl}}/trips/{{tripId}}/start",
+              "host": ["{{baseUrl}}"],
+              "path": ["trips", "{{tripId}}", "start"]
+            }
+          }
+        },
+        {
+          "name": "6. Driver completes the trip",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{driverToken}}" }] },
+            "url": {
+              "raw": "{{baseUrl}}/trips/{{tripId}}/complete",
+              "host": ["{{baseUrl}}"],
+              "path": ["trips", "{{tripId}}", "complete"]
+            }
+          }
+        },
+        {
+          "name": "7. Pay from wallet",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"method\": \"wallet\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/payments/{{bookingId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["payments", "{{bookingId}}"]
+            }
+          }
+        },
+        {
+          "name": "8. Wallet shows the two ledger rows",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/wallet", "host": ["{{baseUrl}}"], "path": ["wallet"] }
+          }
+        },
+        {
+          "name": "9. Illegal transition — restart a completed trip",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('409 rejected by the state machine', () => pm.response.to.have.status(409));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{driverToken}}" }] },
+            "url": {
+              "raw": "{{baseUrl}}/trips/{{tripId}}/start",
+              "host": ["{{baseUrl}}"],
+              "path": ["trips", "{{tripId}}", "start"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Employees",
+          "request": {
+            "method": "GET",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminToken}}" }] },
+            "url": { "raw": "{{baseUrl}}/admin/employees", "host": ["{{baseUrl}}"], "path": ["admin", "employees"] }
+          }
+        },
+        {
+          "name": "Revoke platform access",
+          "request": {
+            "method": "PUT",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminToken}}" }] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"isActive\": false\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/admin/employees/PUT_EMPLOYEE_ID_HERE",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "employees", "PUT_EMPLOYEE_ID_HERE"]
+            }
+          }
+        },
+        {
+          "name": "Settings",
+          "request": {
+            "method": "GET",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminToken}}" }] },
+            "url": { "raw": "{{baseUrl}}/admin/settings", "host": ["{{baseUrl}}"], "path": ["admin", "settings"] }
+          }
+        },
+        {
+          "name": "Update fuel cost",
+          "request": {
+            "method": "PUT",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminToken}}" }] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"fuelCostPerLitre\": 98.25\n}" },
+            "url": { "raw": "{{baseUrl}}/admin/settings", "host": ["{{baseUrl}}"], "path": ["admin", "settings"] }
+          }
+        },
+        {
+          "name": "Safety events",
+          "request": {
+            "method": "GET",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminToken}}" }] },
+            "url": { "raw": "{{baseUrl}}/admin/safety-events", "host": ["{{baseUrl}}"], "path": ["admin", "safety-events"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reports",
+      "item": [
+        {
+          "name": "Summary (incl. CO2 avoided)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/reports/summary", "host": ["{{baseUrl}}"], "path": ["reports", "summary"] }
+          }
+        },
+        {
+          "name": "By vehicle",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/reports/vehicles", "host": ["{{baseUrl}}"], "path": ["reports", "vehicles"] }
+          }
+        },
+        {
+          "name": "Monthly financial summary",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/reports/monthly", "host": ["{{baseUrl}}"], "path": ["reports", "monthly"] }
+          }
+        }
+      ]
+    }
+  ]
+}
