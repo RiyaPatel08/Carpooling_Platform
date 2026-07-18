@@ -8,6 +8,7 @@ import { rideRoutes, bookingRoutes } from './routes/ride.routes.js';
 import { tripRoutes } from './routes/trip.routes.js';
 import { adminRoutes } from './routes/admin.routes.js';
 import { reportRoutes } from './routes/report.routes.js';
+import { walletRoutes, paymentRoutes, savedPlaceRoutes } from './routes/wallet.routes.js';
 
 export function createApp() {
   const app = express();
@@ -36,6 +37,9 @@ export function createApp() {
   app.use('/trips', tripRoutes);
   app.use('/admin', adminRoutes);
   app.use('/reports', reportRoutes);
+  app.use('/wallet', walletRoutes);
+  app.use('/payments', paymentRoutes);
+  app.use('/saved-places', savedPlaceRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
