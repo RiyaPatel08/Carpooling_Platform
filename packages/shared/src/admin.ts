@@ -26,12 +26,27 @@ export const employeeUpdateSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+/**
+ * A bare domain (no @, no scheme) — what comes after the @ in a company
+ * email. Lower-cased so it compares equal to the lower-cased email domain
+ * at registration regardless of how the admin typed it.
+ */
+export const emailDomainSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .regex(/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/, 'Enter a domain like company.com, not an email address')
+  .nullable();
+
 /** Admin Settings tab. These values feed the fare suggestion directly. */
 export const orgSettingsSchema = z.object({
   name: z.string().trim().min(2).max(150).optional(),
   registeredAddress: z.string().trim().max(200).nullable().optional(),
   industry: z.string().trim().max(80).nullable().optional(),
   adminContact: emailSchema.optional(),
+  // Employees can only register with an email on this domain. Nullable to
+  // turn the restriction off (any email + the right company code suffices).
+  emailDomain: emailDomainSchema.optional(),
   fuelCostPerLitre: z.coerce
     .number()
     .positive('Fuel cost must be greater than 0')

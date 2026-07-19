@@ -57,11 +57,35 @@ export const refreshSchema = z.object({
 export const updateProfileSchema = z.object({
   name: z.string().trim().min(2).max(120).optional(),
   phone: phoneSchema.optional(),
-  photoUrl: z.string().url('Photo must be a valid URL').nullable().optional(),
+  // Either an external URL or an /uploads/... path written by POST /me/photo.
+  // A bare .url() rejects our own uploads, which is how the photo silently
+  // failed to save.
+  photoUrl: z
+    .string()
+    .refine(
+      (v) => /^https?:\/\//.test(v) || /^\/uploads\/[\w.-]+$/.test(v),
+      'Photo must be a valid URL',
+    )
+    .nullable()
+    .optional(),
   department: z.string().trim().max(80).nullable().optional(),
   location: z.string().trim().max(80).nullable().optional(),
 });
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+
+/**
+ * Photo upload payload. The 1.2 MB ceiling is on the base64 string, which is
+ * ~33% larger than the bytes it encodes; the service enforces the real limit
+ * after decoding. Rejecting here keeps an oversized body from being parsed at
+ * all.
+ */
+export const uploadPhotoSchema = z.object({
+  photo: z
+    .string()
+    .min(32, 'Photo data is missing')
+    .max(1_200_000, 'Photo is too large — pick a smaller image'),
+});
+export type UploadPhotoInput = z.infer<typeof uploadPhotoSchema>;
 
 export const publicUserSchema = z.object({
   id: z.string().uuid(),

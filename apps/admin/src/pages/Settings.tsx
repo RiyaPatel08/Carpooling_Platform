@@ -10,6 +10,7 @@ interface OrgSettings {
   registeredAddress: string | null;
   industry: string | null;
   adminContact: string | null;
+  emailDomain: string | null;
   fuelCostPerLitre: number;
   defaultMileageKmpl: number;
   costPerKm: number;
@@ -45,6 +46,7 @@ export default function Settings() {
           registeredAddress: form.registeredAddress,
           industry: form.industry,
           adminContact: form.adminContact,
+          emailDomain: form.emailDomain || null,
           fuelCostPerLitre: form.fuelCostPerLitre,
           defaultMileageKmpl: form.defaultMileageKmpl,
           costPerKm: form.costPerKm,
@@ -82,9 +84,12 @@ export default function Settings() {
               <Field label="Industry" value={form.industry ?? ''} onChange={set('industry')} err={fields.industry} />
               <Field label="Registered Address" value={form.registeredAddress ?? ''} onChange={set('registeredAddress')} err={fields.registeredAddress} />
               <Field label="Admin Contact" type="email" value={form.adminContact ?? ''} onChange={set('adminContact')} err={fields.adminContact} />
+              <Field label="Employee Email Domain" placeholder="company.com" value={form.emailDomain ?? ''} onChange={set('emailDomain')} err={fields.emailDomain} />
             </div>
             <div className="muted">
               Company code <strong>{data?.code}</strong> — employees enter this when they register.
+              {' '}Set an Employee Email Domain to also require a matching email (e.g. <code>company.com</code>);
+              leave it blank to allow any email address.
             </div>
           </div>
         </div>
@@ -118,11 +123,18 @@ function Field(props: {
   err?: string;
   type?: string;
   step?: string;
+  placeholder?: string;
 }) {
   return (
     <div className="field">
       <label>{props.label}</label>
-      <input type={props.type ?? 'text'} step={props.step} value={props.value} onChange={props.onChange} />
+      <input
+        type={props.type ?? 'text'}
+        step={props.step}
+        placeholder={props.placeholder}
+        value={props.value}
+        onChange={props.onChange}
+      />
       {props.err && <div className="err">{props.err}</div>}
     </div>
   );

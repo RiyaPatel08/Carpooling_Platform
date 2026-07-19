@@ -36,6 +36,12 @@ export const autocompleteQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(20).default(8),
 });
 
+/** Coordinates to label — "use my current location" and dropped map pins. */
+export const reverseQuerySchema = z.object({
+  lat: z.coerce.number().pipe(latSchema),
+  lng: z.coerce.number().pipe(lngSchema),
+});
+
 export const savedPlaceCreateSchema = z.object({
   label: z.string().min(1).max(50),
   placeName: z.string().min(1).max(120),
