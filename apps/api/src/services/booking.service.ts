@@ -33,24 +33,6 @@ export async function create(
 }> {
   return prisma.$transaction(
     async (tx) => {
-      // Block if the passenger already has an active booking on an ongoing ride.
-      const activeBooking = await tx.booking.findFirst({
-        where: {
-          passengerId,
-          status: 'booked',
-          ride: { status: { in: ['published', 'started'] } },
-        },
-        select: { id: true },
-      });
-      if (activeBooking) throw conflict('You already have an active ride booking. Complete or cancel it before booking another.');
-
-      // Block if the passenger is also a driver with an active ride.
-      const activeDriverRide = await tx.ride.findFirst({
-        where: { driverId: passengerId, status: { in: ['published', 'started'] } },
-        select: { id: true },
-      });
-      if (activeDriverRide) throw conflict('You have an active ride as a driver. Complete or cancel it before booking as a passenger.');
-
       // FOR UPDATE: serialises concurrent bookings on this ride.
       const locked = await tx.$queryRaw<
         {
@@ -113,6 +95,19 @@ export async function create(
         throw conflict(
           'You already have an active booking. Cancel it or wait for it to finish before booking another ride.',
           'ACTIVE_BOOKING_EXISTS',
+        );
+      }
+
+      // A driver mid-carpool cannot also book a seat as a passenger on
+      // someone else's ride — same one-thing-at-a-time rule, other direction.
+      const activeAsDriver = await tx.ride.findFirst({
+        where: { driverId: passengerId, status: { in: ['published', 'started'] } },
+        select: { id: true },
+      });
+      if (activeAsDriver) {
+        throw conflict(
+          'You have an active ride as a driver. Complete or cancel it before booking as a passenger.',
+          'ACTIVE_RIDE_EXISTS',
         );
       }
 
