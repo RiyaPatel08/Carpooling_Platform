@@ -84,6 +84,12 @@ model Organization {
   registeredAddress  String?  @map("registered_address")
   industry           String?
   adminContact       String?  @map("admin_contact")
+  // Employees may only register with an email on this domain — the whole
+  // point of the platform is intra-company carpooling, so signup must be
+  // gated by more than the (easily-shared) company code alone. Nullable so
+  // an org can be created before its domain is decided; registration is
+  // unrestricted until an admin sets one.
+  emailDomain        String?  @map("email_domain")
   // Admin-configurable, drives the fare suggestion (mockup: Settings tab).
   fuelCostPerLitre   Decimal  @default(96.50) @map("fuel_cost_per_litre") @db.Decimal(8, 2)
   defaultMileageKmpl Decimal  @default(18.0) @map("default_mileage_kmpl") @db.Decimal(5, 2)
