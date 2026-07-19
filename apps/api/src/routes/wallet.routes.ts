@@ -6,7 +6,7 @@ import { asyncHandler } from '../middleware/error.js';
 import { requireAuth, auth } from '../middleware/auth.js';
 import * as wallet from '../services/wallet.service.js';
 import { prisma } from '../db.js';
-import { emitToTrip } from '../realtime/io.js';
+import { emitToTrip, notify } from '../realtime/io.js';
 import { forbidden, notFound } from '../lib/errors.js';
 
 export const walletRoutes = Router();
@@ -62,6 +62,13 @@ paymentRoutes.post(
         message: 'Payment received',
       });
     }
+
+    notify(result.driverId, {
+      kind: 'payment_received',
+      title: 'Fare received',
+      body: `₹${result.amount.toFixed(2)} has been credited to your wallet.`,
+      tripId: result.tripId,
+    });
 
     res.json(result);
   }),

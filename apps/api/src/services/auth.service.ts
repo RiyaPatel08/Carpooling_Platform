@@ -61,6 +61,16 @@ export async function register(input: RegisterInput): Promise<AuthResponse> {
     throw badRequest('That company code was not recognised. Check with your administrator.');
   }
 
+  // Intra-company carpooling is the whole premise: the org code alone is
+  // easily shared outside the company, so when an admin has set a domain,
+  // registration is gated on the employee actually having that email.
+  if (org.emailDomain) {
+    const domain = input.email.split('@')[1];
+    if (domain !== org.emailDomain) {
+      throw badRequest(`Registration requires a ${org.emailDomain} email address`);
+    }
+  }
+
   const existing = await prisma.user.findUnique({
     where: { orgId_email: { orgId: org.id, email: input.email } },
   });

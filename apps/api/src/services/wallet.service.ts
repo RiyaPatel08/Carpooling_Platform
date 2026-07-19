@@ -151,7 +151,15 @@ export async function payBooking(
   orgId: string,
   method: PaymentMethod,
   gatewayRef?: string,
-): Promise<{ paymentId: string; status: 'success'; balance: number | null; tripId: string | null }> {
+): Promise<{
+  paymentId: string;
+  status: 'success';
+  balance: number | null;
+  tripId: string | null;
+  /** Who earned this fare — notified once the transaction has committed. */
+  driverId: string;
+  amount: number;
+}> {
   return prisma.$transaction(async (tx) => {
     const booking = await tx.booking.findUnique({
       where: { id: bookingId },
@@ -242,6 +250,13 @@ export async function payBooking(
       await tx.trip.update({ where: { id: trip.id }, data: { status: 'payment_completed' } });
     }
 
-    return { paymentId: payment.id, status: 'success' as const, balance: newBalance, tripId: trip.id };
+    return {
+      paymentId: payment.id,
+      status: 'success' as const,
+      balance: newBalance,
+      tripId: trip.id,
+      driverId: booking.ride.driver.id,
+      amount,
+    };
   });
 }

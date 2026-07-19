@@ -145,8 +145,7 @@ export async function history(userId: string, orgId: string) {
   return all.filter((t) => ['completed', 'payment_pending', 'payment_completed'].includes(t.status));
 }
 
-/** Participants of a trip — used to authorise socket joins and chat. */
-export async function assertParticipant(tripId: string, userId: string): Promise<{ rideId: string }> {
+async function loadParticipants(tripId: string) {
   const trip = await prisma.trip.findUnique({
     where: { id: tripId },
     include: {
@@ -160,6 +159,12 @@ export async function assertParticipant(tripId: string, userId: string): Promise
     },
   });
   if (!trip) throw notFound('Trip not found');
+  return trip;
+}
+
+/** Participants of a trip — used to authorise socket joins and chat. */
+export async function assertParticipant(tripId: string, userId: string): Promise<{ rideId: string }> {
+  const trip = await loadParticipants(tripId);
 
   const isDriver = trip.ride.driverId === userId;
   const isPassenger = trip.ride.bookings.some((b) => b.passengerId === userId);
@@ -167,4 +172,10 @@ export async function assertParticipant(tripId: string, userId: string): Promise
   if (!isDriver && !isPassenger) throw forbidden('You are not part of this trip');
 
   return { rideId: trip.ride.id };
+}
+
+/** Everyone on a trip: the driver plus every passenger still booked. */
+export async function participantIds(tripId: string): Promise<string[]> {
+  const trip = await loadParticipants(tripId);
+  return [trip.ride.driverId, ...trip.ride.bookings.map((b) => b.passengerId)];
 }

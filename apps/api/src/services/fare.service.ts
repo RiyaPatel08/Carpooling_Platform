@@ -46,10 +46,32 @@ export function suggestFare(input: FareInputs): FareSuggestion {
   };
 }
 
-/** What a passenger owes: per-seat fare times seats taken. */
-export function bookingFare(farePerSeat: number, seats: number): number {
+/**
+ * Floor on the share of the route a passenger is billed for.
+ *
+ * A passenger riding 5% of a 40 km corridor does not cost the driver 5% of the
+ * trip: the driver still detours to the pickup, stops, and rejoins the route.
+ * Billing strictly by distance would make short hops effectively free and push
+ * the cost onto whoever rides furthest. Every ride-share prices this the same
+ * way — a minimum fare. Tune here if the demo corridor makes it look wrong.
+ */
+export const MIN_FARE_FRACTION = 0.25;
+
+/**
+ * What a passenger owes for the sub-segment they actually ride.
+ *
+ * `fraction` is how much of the driver's route lies between the passenger's
+ * pickup and drop, as returned by ST_LineLocatePoint. A passenger boarding at
+ * the origin and alighting at the destination gets 1.0 and pays the full
+ * per-seat fare; a mid-corridor hop pays proportionally less. Without this,
+ * corridor matching sells a 5 km leg at the price of a 40 km one — which is
+ * the whole point of matching on sub-segments in the first place.
+ */
+export function bookingFare(farePerSeat: number, seats: number, fraction = 1): number {
   if (seats < 1) throw new Error('seats must be at least 1');
-  return round2(farePerSeat * seats);
+  if (!Number.isFinite(fraction)) fraction = 1;
+  const share = Math.min(1, Math.max(MIN_FARE_FRACTION, fraction));
+  return round2(farePerSeat * seats * share);
 }
 
 function round2(n: number): number {

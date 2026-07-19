@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { loginSchema, registerSchema, refreshSchema, updateProfileSchema } from '@syncroute/shared';
+import { loginSchema, registerSchema, refreshSchema, updateProfileSchema, uploadPhotoSchema } from '@syncroute/shared';
+import { saveProfilePhoto } from '../services/photo.service.js';
 import { validateBody } from '../middleware/validate.js';
 import { asyncHandler } from '../middleware/error.js';
 import { requireAuth, auth } from '../middleware/auth.js';
@@ -69,5 +70,20 @@ meRoutes.put(
     // another's profile regardless of what they put in the body.
     const user = await prisma.user.update({ where: { id: sub }, data: req.body });
     res.json(authService.toPublicUser(user));
+  }),
+);
+
+/**
+ * Profile photo upload. Separate from PUT /me because the payload is orders of
+ * magnitude larger than the rest of the profile and has its own size limit.
+ */
+meRoutes.post(
+  '/photo',
+  validateBody(uploadPhotoSchema),
+  asyncHandler(async (req, res) => {
+    const { sub } = auth(req);
+    const photoUrl = await saveProfilePhoto(sub, req.body.photo);
+    const user = await prisma.user.findUnique({ where: { id: sub } });
+    res.json({ ...authService.toPublicUser(user!), photoUrl });
   }),
 );

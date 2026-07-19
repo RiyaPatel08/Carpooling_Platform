@@ -133,7 +133,31 @@ admin, safety alert, the three mockup screens (Offer Ride / My Vehicle / Ride Hi
 - Commit early, commit small; ≥1 commit per member in H1.
 
 ## Discovered mid-process
-- [ ] (add here)
+- [x] **Cross-navigator navigation was silently dead.** Tab routes (Dashboard,
+      MyTrips, MyVehicle, Wallet, Settings) live inside the `Main` stack screen.
+      React Navigation resolves a route name UPWARD through parents only, never
+      downward into a child, so `navigate('MyTrips')` from any stack screen
+      matched nothing and was dropped without an error. This is why "View Trip",
+      "Go to My Vehicle", "Add money", "View My Trips" and publish-a-ride all
+      appeared to do nothing. Fixed by splitting `MainTabParamList` from
+      `RootStackParamList` (so TypeScript now catches it) plus a `goToTab()`
+      helper. Affected: RouteConfirmation, TripDetails, AvailableRides,
+      OfferRide, Payment.
+- [x] **Sub-segment bookings were billed the full-route fare.** `bookingFare()`
+      ignored pickup/drop entirely. Now prices by the share of the driver's
+      route actually ridden, via `ST_LineLocatePoint` (the same function
+      corridor matching already used), with a 25% minimum-fare floor. Search
+      results show `yourFarePerSeat` so the quote matches the charge.
+- [x] **`socket.off(event)` with no handler** in Chat and TrackRide removed
+      EVERY listener for that event, including other screens' and the
+      notification provider's. Now removes only its own handler.
+- [x] **Cancelled trip showed an endless spinner.** TripDetails treated
+      `trip === null` as both "loading" and "not found", and cancelling removes
+      the ride from `/trips/mine`. Now a three-state load with a real
+      "no longer active" screen.
+- [x] **`photoUrl` was validated as `.url()`**, which rejects our own
+      `/uploads/...` paths — the profile photo could never save.
+- [ ] Wallet refund on cancellation is still not implemented (backlog).
 
 ## Notes from mentor meeting #1
 - No Firebase (rubric overrides mentor's passing suggestion) — Postgres + WebSocket
