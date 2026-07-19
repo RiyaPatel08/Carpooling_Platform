@@ -1,30 +1,70 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Button, Field, ErrorNote } from '../components/ui';
-import { registerRequest, ApiError } from '../lib/api';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { Avatar, Button, Field, ErrorNote } from '../components/ui';
+import { registerRequest, api, ApiError, type AuthUser } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { pickSquarePhoto, ImagePickerUnavailable, type PickedImage } from '../lib/imagePicker';
 import { colors, radius, spacing } from '../theme';
 import type { ScreenProps } from '../lib/navigation';
 
 export default function Signup({ navigation }: ScreenProps<'Signup'>) {
-  const { signIn } = useAuth();
+  const { signIn, refreshUser } = useAuth();
   const [form, setForm] = useState({
-    orgCode: '', name: '', phone: '', email: '', password: '', confirmPassword: '', photoUrl: '',
+    orgCode: '', name: '', phone: '', email: '', password: '', confirmPassword: '',
   });
+  const [photo, setPhoto] = useState<PickedImage | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  const [pickingPhoto, setPickingPhoto] = useState(false);
 
   const set = (k: keyof typeof form) => (v: string) => setForm({ ...form, [k]: v });
+
+  async function pickPhoto() {
+    setPickingPhoto(true);
+    try {
+      const picked = await pickSquarePhoto();
+      if (picked) setPhoto(picked);
+    } catch (e) {
+      if (e instanceof ImagePickerUnavailable) {
+        Alert.alert(
+          'Photo picker unavailable',
+          'This build does not include the photo picker. Run:\n\n' +
+            'pnpm --filter @syncroute/mobile add expo-image-picker\n\n' +
+            'with the Expo dev server stopped, then restart the app.',
+        );
+      } else {
+        Alert.alert('Could not open your photo library', e instanceof Error ? e.message : undefined);
+      }
+    } finally {
+      setPickingPhoto(false);
+    }
+  }
 
   async function submit() {
     setBusy(true);
     setError(null);
     setFields({});
     try {
-      const payload: Record<string, unknown> = { ...form };
-      if (!form.photoUrl) delete payload.photoUrl;
-      await signIn(await registerRequest(payload));
+      // The photo can only be uploaded once the account exists — there is no
+      // token to authorise the upload before registration succeeds — so it
+      // is a second call, right after sign-in, using the token that just
+      // came back.
+      const auth = await registerRequest(form);
+      await signIn(auth);
+      if (photo) {
+        try {
+          const updated = await api<AuthUser>('/me/photo', {
+            method: 'POST',
+            body: JSON.stringify({ photo: `data:${photo.mimeType};base64,${photo.base64}` }),
+          });
+          await refreshUser(updated);
+        } catch {
+          // The account is already created and signed in; a failed photo
+          // upload is not worth blocking on. They can set it from Profile.
+        }
+      }
     } catch (e) {
       if (e instanceof ApiError) {
         setError(e.message);
@@ -36,20 +76,24 @@ export default function Signup({ navigation }: ScreenProps<'Signup'>) {
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    >
       <ScrollView contentContainerStyle={s.wrap} keyboardShouldPersistTaps="handled">
         <Text style={s.title}>Create Account</Text>
         <Text style={s.sub}>Join your company's carpool</Text>
 
         {!!error && <ErrorNote text={error} />}
 
-        {/* Photo upload is a URL field: no image host in scope, and the
-            profile picture only needs to identify a colleague at pickup. */}
-        <Pressable style={s.photo}>
-          <Text style={{ color: colors.textMuted, fontSize: 13 }}>
-            {form.photoUrl ? 'Photo set' : 'Profile photo (optional)'}
-          </Text>
+        <Pressable onPress={pickPhoto} disabled={pickingPhoto} style={s.photoWrap} accessibilityRole="button">
+          <Avatar uri={photo ? `data:${photo.mimeType};base64,${photo.base64}` : null} name={form.name} size={88} />
+          <View style={s.camera}>
+            <Ionicons name={pickingPhoto ? 'hourglass' : 'camera'} size={14} color="#fff" />
+          </View>
         </Pressable>
+        <Text style={s.photoHint}>{photo ? 'Tap to change photo' : 'Add a profile photo (optional)'}</Text>
 
         <Field
           label="Company Code"
@@ -90,14 +134,6 @@ export default function Signup({ navigation }: ScreenProps<'Signup'>) {
           secureTextEntry
           error={fields.confirmPassword}
         />
-        <Field
-          label="Photo URL (optional)"
-          value={form.photoUrl}
-          onChangeText={set('photoUrl')}
-          autoCapitalize="none"
-          placeholder="https://…"
-          error={fields.photoUrl}
-        />
 
         <Button title="Sign Up" onPress={submit} loading={busy} />
 
@@ -113,10 +149,13 @@ const s = StyleSheet.create({
   wrap: { padding: spacing.lg, backgroundColor: colors.background, flexGrow: 1 },
   title: { fontSize: 26, fontWeight: '700', color: colors.text },
   sub: { fontSize: 15, color: colors.textMuted, marginBottom: spacing.lg },
-  photo: {
-    height: 88, width: 88, borderRadius: radius.pill, alignSelf: 'center',
-    backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center',
-    marginBottom: spacing.lg, padding: spacing.sm,
+  photoWrap: { alignSelf: 'center' },
+  camera: {
+    position: 'absolute', right: -2, bottom: -2,
+    width: 28, height: 28, borderRadius: 14, backgroundColor: colors.primary,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2.5, borderColor: colors.background,
   },
+  photoHint: { textAlign: 'center', color: colors.textMuted, fontSize: 12, marginTop: spacing.sm, marginBottom: spacing.lg },
   link: { textAlign: 'center', color: colors.primary, fontWeight: '600' },
 });

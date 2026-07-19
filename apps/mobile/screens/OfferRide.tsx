@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import PlacePicker, { type Place } from '../components/PlacePicker';
+import WhenPicker, { defaultDeparture } from '../components/WhenPicker';
 import { Button, Field, ErrorNote, Loading } from '../components/ui';
 import { api } from '../lib/api';
 import { colors, radius, spacing } from '../theme';
-import type { ScreenProps } from '../lib/navigation';
+import { goToTab, type ScreenProps } from '../lib/navigation';
 
 interface Vehicle {
   id: string;
@@ -20,7 +21,7 @@ export default function OfferRide({ navigation }: ScreenProps<'OfferRide'>) {
   const [vehicleId, setVehicleId] = useState<string | null>(null);
   const [from, setFrom] = useState<Place | null>(null);
   const [to, setTo] = useState<Place | null>(null);
-  const [when, setWhen] = useState(defaultWhen());
+  const [when, setWhen] = useState(defaultDeparture);
   const [seats, setSeats] = useState('3');
   const [fare, setFare] = useState('');
   const [suggested, setSuggested] = useState<number | null>(null);
@@ -67,16 +68,28 @@ export default function OfferRide({ navigation }: ScreenProps<'OfferRide'>) {
   function submit() {
     if (!vehicleId) return setError('Select an approved vehicle first.');
     if (!from || !to) return setError('Pick both a start and a destination from the suggestions.');
-    const date = new Date(when);
-    if (Number.isNaN(date.getTime())) return setError('Enter the date and time as YYYY-MM-DD HH:MM.');
-    if (!fare || Number(fare) < 0) return setError('Enter a fare per seat.');
+    if (from.lat === to.lat && from.lng === to.lng) {
+      return setError('Start and destination cannot be the same place.');
+    }
+    // The picker cannot produce a past time, but a form left open across a
+    // long pause can go stale — re-check at submit rather than trusting it.
+    if (when.getTime() <= Date.now()) {
+      return setError('That departure time has passed. Pick a new time.');
+    }
+    const seatCount = Number(seats);
+    if (!Number.isInteger(seatCount) || seatCount < 1 || seatCount > 7) {
+      return setError('Offer between 1 and 7 seats.');
+    }
+    if (fare === '' || Number.isNaN(Number(fare)) || Number(fare) < 0) {
+      return setError('Enter a fare per seat.');
+    }
 
     setError(null);
     navigation.navigate('RouteConfirmation', {
       mode: 'offer',
       from, to,
-      date: date.toISOString(),
-      seats: Number(seats) || 1,
+      date: when.toISOString(),
+      seats: seatCount,
       farePerSeat: Number(fare),
       vehicleId,
     });
@@ -99,7 +112,7 @@ export default function OfferRide({ navigation }: ScreenProps<'OfferRide'>) {
           <Button
             title="Go to My Vehicle"
             variant="secondary"
-            onPress={() => navigation.navigate('MyVehicle')}
+            onPress={() => goToTab('MyVehicle')}
             style={{ marginTop: spacing.sm }}
           />
         </View>
@@ -130,7 +143,7 @@ export default function OfferRide({ navigation }: ScreenProps<'OfferRide'>) {
 
           <PlacePicker label="Destination Location" value={to} onChange={setTo} placeholder="Enter drop location" />
 
-          <Field label="Date & Time" value={when} onChangeText={setWhen} placeholder="2026-07-18 19:00" />
+          <WhenPicker label="Departure" value={when} onChange={setWhen} />
           <Field label="Available Seats" value={seats} onChangeText={setSeats} keyboardType="number-pad" />
           <Field label="Fare Per Seat (₹)" value={fare} onChangeText={setFare} keyboardType="decimal-pad" />
 
@@ -146,13 +159,6 @@ export default function OfferRide({ navigation }: ScreenProps<'OfferRide'>) {
       )}
     </ScrollView>
   );
-}
-
-function defaultWhen(): string {
-  const d = new Date();
-  d.setHours(d.getHours() + 1, 0, 0, 0);
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
 const s = StyleSheet.create({

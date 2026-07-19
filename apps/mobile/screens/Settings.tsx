@@ -1,12 +1,14 @@
 import { useCallback, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import PlacePicker, { type Place } from '../components/PlacePicker';
-import { Button, Card, ErrorNote, Field } from '../components/ui';
+import { Avatar, Button, Card, ErrorNote, Field } from '../components/ui';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { colors, spacing } from '../theme';
-import type { ScreenProps } from '../lib/navigation';
+import type { TabScreenProps } from '../lib/navigation';
+import { photoSrc } from './Profile';
 
 interface SavedPlace {
   id: string;
@@ -16,15 +18,22 @@ interface SavedPlace {
   lng: number;
 }
 
+/**
+ * `kind` distinguishes a tab route from a stack route because they are
+ * reached differently — see lib/navigation. Getting this wrong is silent:
+ * the row highlights and nothing happens.
+ */
 const LINKS = [
-  { label: 'My Trips', screen: 'MyTrips' },
-  { label: 'My Vehicle', screen: 'MyVehicle' },
-  { label: 'Wallet', screen: 'Wallet' },
-  { label: 'Ride History', screen: 'RideHistory' },
-  { label: 'Reports', screen: 'Reports' },
+  { label: 'My Profile', icon: 'person-circle', screen: 'Profile', kind: 'stack' },
+  { label: 'My Trips', icon: 'list', screen: 'MyTrips', kind: 'tab' },
+  { label: 'My Vehicle', icon: 'construct', screen: 'MyVehicle', kind: 'tab' },
+  { label: 'Wallet', icon: 'wallet', screen: 'Wallet', kind: 'tab' },
+  { label: 'Ride History', icon: 'time', screen: 'RideHistory', kind: 'stack' },
+  { label: 'Reports', icon: 'bar-chart', screen: 'Reports', kind: 'stack' },
+  { label: 'Help & Support', icon: 'help-buoy', screen: 'Help', kind: 'stack' },
 ] as const;
 
-export default function Settings({ navigation }: ScreenProps<'Settings'>) {
+export default function Settings({ navigation }: TabScreenProps<'Settings'>) {
   const { user, signOut } = useAuth();
   const [places, setPlaces] = useState<SavedPlace[]>([]);
   const [newLabel, setNewLabel] = useState('');
@@ -76,22 +85,36 @@ export default function Settings({ navigation }: ScreenProps<'Settings'>) {
     <ScrollView contentContainerStyle={s.wrap} keyboardShouldPersistTaps="handled">
       <Text style={s.title}>Settings</Text>
 
-      <Card>
-        <Text style={s.name}>{user?.name}</Text>
-        <Text style={s.meta}>{user?.email}</Text>
-        <Text style={s.meta}>{user?.phone}</Text>
-      </Card>
+      <Pressable onPress={() => navigation.navigate('Profile')}>
+        <Card>
+          <View style={s.profile}>
+            <Avatar uri={photoSrc(user?.photoUrl)} name={user?.name} size={52} />
+            <View style={{ flex: 1 }}>
+              <Text style={s.name}>{user?.name}</Text>
+              <Text style={s.meta}>{user?.email}</Text>
+              <Text style={s.meta}>{user?.phone}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+          </View>
+        </Card>
+      </Pressable>
 
       <Text style={s.section}>Quick access</Text>
       <Card>
         {LINKS.map((l, i) => (
           <Pressable
             key={l.screen}
-            onPress={() => navigation.navigate(l.screen)}
+            onPress={() =>
+              l.kind === 'tab'
+                ? navigation.navigate(l.screen as 'MyTrips')
+                : navigation.navigate(l.screen as 'Reports')
+            }
             style={[s.link, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}
+            accessibilityRole="button"
           >
+            <Ionicons name={l.icon} size={19} color={colors.primary} style={{ width: 26 }} />
             <Text style={s.linkText}>{l.label}</Text>
-            <Text style={s.chevron}>›</Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </Pressable>
         ))}
       </Card>
@@ -141,9 +164,9 @@ const s = StyleSheet.create({
   name: { fontSize: 18, fontWeight: '700', color: colors.text },
   meta: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
   section: { fontSize: 13, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', marginBottom: spacing.sm },
-  link: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 13 },
-  linkText: { fontSize: 15, color: colors.text, fontWeight: '500' },
-  chevron: { fontSize: 22, color: colors.textMuted },
+  profile: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  link: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 13 },
+  linkText: { fontSize: 15, color: colors.text, fontWeight: '500', flex: 1 },
   placeRow: {
     flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: spacing.md,
   },

@@ -35,6 +35,17 @@ export default function Chat({ route }: ScreenProps<'Chat'>) {
       .then((m) => active && setMessages(m))
       .catch(() => undefined);
 
+    // Named handler so the cleanup can remove exactly this listener.
+    // socket.off('chat:message') with no handler drops EVERY subscriber,
+    // including the notification provider's — leaving the app silent after
+    // the first visit to a chat.
+    const onMessage = (m: Message) => {
+      if (!active || m.tripId !== tripId) return;
+      // De-dupe on id: the server echoes to the room, and a reconnect can
+      // replay a message that history already delivered.
+      setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
+    };
+
     (async () => {
       try {
         await joinTrip(tripId);
@@ -42,14 +53,12 @@ export default function Chat({ route }: ScreenProps<'Chat'>) {
         if (active) setError((e as Error).message);
         return;
       }
-      getSocket().on('chat:message', (m: Message) => {
-        if (active && m.tripId === tripId) setMessages((prev) => [...prev, m]);
-      });
+      getSocket().on('chat:message', onMessage);
     })();
 
     return () => {
       active = false;
-      getSocket().off('chat:message');
+      getSocket().off('chat:message', onMessage);
       leaveTrip(tripId);
     };
   }, [tripId]);

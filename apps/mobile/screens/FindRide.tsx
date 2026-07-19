@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import PlacePicker, { type Place } from '../components/PlacePicker';
+import WhenPicker, { defaultDeparture } from '../components/WhenPicker';
 import { Button, Field, ErrorNote } from '../components/ui';
 import { colors, radius, spacing } from '../theme';
 import type { ScreenProps } from '../lib/navigation';
@@ -10,7 +11,7 @@ const DAYS = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'] as const;
 export default function FindRide({ navigation }: ScreenProps<'FindRide'>) {
   const [from, setFrom] = useState<Place | null>(null);
   const [to, setTo] = useState<Place | null>(null);
-  const [when, setWhen] = useState(defaultWhen());
+  const [when, setWhen] = useState(defaultDeparture);
   const [seats, setSeats] = useState('1');
   const [recurring, setRecurring] = useState(false);
   const [days, setDays] = useState<string[]>(['MO', 'TU', 'WE', 'TH', 'FR']);
@@ -26,17 +27,25 @@ export default function FindRide({ navigation }: ScreenProps<'FindRide'>) {
       setError('Pick both a start and a destination from the suggestions.');
       return;
     }
-    const date = new Date(when);
-    if (Number.isNaN(date.getTime())) {
-      setError('Enter the date and time as YYYY-MM-DD HH:MM.');
+    if (from.lat === to.lat && from.lng === to.lng) {
+      setError('Start and destination cannot be the same place.');
+      return;
+    }
+    const seatCount = Number(seats);
+    if (!Number.isInteger(seatCount) || seatCount < 1 || seatCount > 7) {
+      setError('Enter between 1 and 7 seats.');
+      return;
+    }
+    if (recurring && days.length === 0) {
+      setError('Pick at least one day for a recurring ride.');
       return;
     }
     setError(null);
     navigation.navigate('RouteConfirmation', {
       mode: 'find',
       from, to,
-      date: date.toISOString(),
-      seats: Number(seats) || 1,
+      date: when.toISOString(),
+      seats: seatCount,
       recurrence: recurring ? days : undefined,
     });
   }
@@ -55,7 +64,7 @@ export default function FindRide({ navigation }: ScreenProps<'FindRide'>) {
 
       <PlacePicker label="Destination Location" value={to} onChange={setTo} placeholder="Enter drop location" />
 
-      <Field label="Date & Time" value={when} onChangeText={setWhen} placeholder="2026-07-18 19:00" />
+      <WhenPicker label="Leaving around" value={when} onChange={setWhen} />
       <Field label="Seats Required" value={seats} onChangeText={setSeats} keyboardType="number-pad" />
 
       <View style={s.switchRow}>
@@ -87,14 +96,6 @@ export default function FindRide({ navigation }: ScreenProps<'FindRide'>) {
       <Button title="Find Ride" onPress={submit} style={{ marginTop: spacing.md }} />
     </ScrollView>
   );
-}
-
-/** Default to the next round hour — the common "leaving soon" case. */
-function defaultWhen(): string {
-  const d = new Date();
-  d.setHours(d.getHours() + 1, 0, 0, 0);
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
 const s = StyleSheet.create({

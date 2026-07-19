@@ -3,7 +3,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { Button, Card, ErrorNote } from '../components/ui';
 import { api, ApiError } from '../lib/api';
 import { colors, radius, spacing } from '../theme';
-import type { ScreenProps } from '../lib/navigation';
+import { goToTab, type ScreenProps } from '../lib/navigation';
 
 type Method = 'cash' | 'card' | 'upi' | 'wallet';
 
@@ -82,7 +82,7 @@ export default function Payment({ route, navigation }: ScreenProps<'Payment'>) {
           <Button
             title="Recharge Wallet"
             variant="secondary"
-            onPress={() => navigation.navigate('Wallet')}
+            onPress={() => goToTab('Wallet')}
             style={{ marginTop: spacing.sm }}
           />
         </View>
