@@ -4,7 +4,7 @@ import { Badge, Button, Card, Empty, ErrorNote, Loading } from '../components/ui
 import { api, ApiError } from '../lib/api';
 import { colors, radius, spacing } from '../theme';
 import type { Place } from '../components/PlacePicker';
-import type { ScreenProps } from '../lib/navigation';
+import { goToTab, type ScreenProps } from '../lib/navigation';
 
 interface Params { from: Place; to: Place; date: string; seats: number }
 
@@ -20,6 +20,8 @@ interface Ride {
   routeDistanceM: number | null;
   recurrenceRule: string | null;
   detourMinutes?: number | null;
+  /** Price for the segment this passenger asked for; what they'll be charged. */
+  yourFarePerSeat?: number | null;
 }
 
 export default function AvailableRides({ route, navigation }: ScreenProps<'AvailableRides'>) {
@@ -64,7 +66,7 @@ export default function AvailableRides({ route, navigation }: ScreenProps<'Avail
       Alert.alert(
         'Seat booked',
         `₹${res.fareTotal} for ${p.seats} seat(s). ${res.seatsRemaining} left on this ride.`,
-        [{ text: 'View My Trips', onPress: () => navigation.navigate('MyTrips') }],
+        [{ text: 'View My Trips', onPress: () => goToTab('MyTrips') }],
       );
       void load();
     } catch (e) {
@@ -113,8 +115,29 @@ export default function AvailableRides({ route, navigation }: ScreenProps<'Avail
 
           <Text style={s.route}>{item.originLabel} → {item.destLabel}</Text>
 
+          {/* Quote the segment price, not the full-route price. Showing
+              farePerSeat here while charging the segment fare is how a
+              passenger ends up seeing two different numbers for one ride. */}
+          {(() => {
+            const yours = item.yourFarePerSeat ?? item.farePerSeat;
+            const discounted = yours < item.farePerSeat;
+            return (
+              <View style={s.priceRow}>
+                <Text style={s.price}>₹{yours.toFixed(0)}</Text>
+                <Text style={s.priceUnit}>
+                  / seat{p.seats > 1 ? ` · ₹${(yours * p.seats).toFixed(0)} total` : ''}
+                </Text>
+                {discounted && (
+                  <Text style={s.strike}>₹{item.farePerSeat.toFixed(0)}</Text>
+                )}
+              </View>
+            );
+          })()}
+          {(item.yourFarePerSeat ?? item.farePerSeat) < item.farePerSeat && (
+            <Text style={s.priceNote}>You only ride part of this route</Text>
+          )}
+
           <View style={s.tags}>
-            <Badge text={`₹${item.farePerSeat} / seat`} tone="green" />
             <Badge text={`${item.seatsAvailable} available`} tone="grey" />
             {/* The number endpoint-matching cannot produce. */}
             {typeof item.detourMinutes === 'number' && (
@@ -147,5 +170,12 @@ const s = StyleSheet.create({
   vehicle: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
   time: { fontSize: 13, color: colors.textMuted, textAlign: 'right' },
   route: { fontSize: 14, color: colors.text, marginBottom: spacing.sm },
+  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
+  price: { fontSize: 22, fontWeight: '700', color: colors.text },
+  priceUnit: { fontSize: 13, color: colors.textMuted },
+  strike: {
+    fontSize: 13, color: colors.textMuted, textDecorationLine: 'line-through',
+  },
+  priceNote: { fontSize: 12, color: colors.success, fontWeight: '600', marginTop: 2 },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
 });

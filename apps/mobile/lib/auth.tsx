@@ -7,6 +7,8 @@ interface AuthContext {
   ready: boolean;
   signIn: (auth: StoredAuth) => Promise<void>;
   signOut: () => Promise<void>;
+  /** Persist a freshly-updated profile so avatars refresh app-wide. */
+  refreshUser: (user: AuthUser) => Promise<void>;
 }
 
 const Ctx = createContext<AuthContext>({
@@ -14,6 +16,7 @@ const Ctx = createContext<AuthContext>({
   ready: false,
   signIn: async () => {},
   signOut: async () => {},
+  refreshUser: async () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -41,6 +44,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           disconnectSocket();
           await saveAuth(null);
           setUser(null);
+        },
+        refreshUser: async (next) => {
+          // Rewrite the stored session so the new name/photo survives a
+          // restart; the tokens are untouched.
+          const current = await loadAuth();
+          if (current) await saveAuth({ ...current, user: next });
+          setUser(next);
         },
       }}
     >

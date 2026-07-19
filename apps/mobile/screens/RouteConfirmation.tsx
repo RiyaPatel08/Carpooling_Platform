@@ -5,7 +5,7 @@ import { Button, Card, ErrorNote, Loading } from '../components/ui';
 import { api, ApiError } from '../lib/api';
 import { colors, spacing } from '../theme';
 import type { Place } from '../components/PlacePicker';
-import type { ScreenProps } from '../lib/navigation';
+import { goToTab, type ScreenProps } from '../lib/navigation';
 
 interface Params {
   mode: 'find' | 'offer';
@@ -60,7 +60,11 @@ export default function RouteConfirmation({ route, navigation }: ScreenProps<'Ro
           ...(p.recurrence ? { recurrenceRule: p.recurrence } : {}),
         }),
       });
-      navigation.replace('MyTrips');
+      // Clear the Offer Ride form off the stack, then land on My Trips.
+      // replace('MyTrips') silently did nothing: MyTrips is a tab route, not
+      // a stack route, so publishing appeared to hang on this screen.
+      navigation.popToTop();
+      goToTab('MyTrips');
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not publish the ride');
     } finally {

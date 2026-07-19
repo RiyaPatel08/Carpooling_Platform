@@ -43,8 +43,16 @@ export default function MyVehicle() {
         style: 'destructive',
         onPress: async () => {
           try {
-            await api(`/vehicles/${v.id}`, { method: 'DELETE' });
+            const result = await api<{ deleted: boolean }>(`/vehicles/${v.id}`, { method: 'DELETE' });
             await load();
+            if (!result.deleted) {
+              Alert.alert(
+                'Vehicle deactivated',
+                'This vehicle has ride history, so it cannot be deleted outright — it has been ' +
+                  'marked inactive instead and can no longer be used to offer rides. Your ' +
+                  'administrator can see this in the Vehicles list.',
+              );
+            }
           } catch (e) {
             Alert.alert('Could not remove', e instanceof ApiError ? e.message : 'Please try again');
           }
@@ -92,8 +100,16 @@ export default function MyVehicle() {
               Your administrator needs to approve this before you can publish rides with it.
             </Text>
           )}
+          {v.status === 'inactive' && (
+            <Text style={s.hint}>
+              This vehicle is inactive and cannot be used to offer rides. Ask your administrator
+              to reactivate it if you need it again.
+            </Text>
+          )}
 
-          <Button title="Remove" variant="secondary" onPress={() => remove(v)} style={{ marginTop: spacing.sm }} />
+          {v.status !== 'inactive' && (
+            <Button title="Remove" variant="secondary" onPress={() => remove(v)} style={{ marginTop: spacing.sm }} />
+          )}
         </Card>
       ))}
     </ScrollView>
