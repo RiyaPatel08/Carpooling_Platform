@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Badge, Empty, ErrorNote, Loading } from '../components/ui';
 import { api, ApiError } from '../lib/api';
+import { useAuth } from '../lib/auth';
 import { colors, radius, spacing } from '../theme';
 import type { TabScreenProps } from '../lib/navigation';
 
@@ -86,6 +87,7 @@ function StatusCard({
 }
 
 export default function MyTrips({ navigation }: TabScreenProps<'MyTrips'>) {
+  const { user } = useAuth();
   const [trips, setTrips] = useState<TripRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -136,7 +138,14 @@ export default function MyTrips({ navigation }: TabScreenProps<'MyTrips'>) {
       renderItem={({ item }) => {
         const isCancelled = item.rideStatus === 'cancelled';
         const seatsBooked = item.seatsTotal - item.seatsAvailable;
-        const tone = isCancelled ? 'red' : STATUS_TONE[item.status] ?? 'grey';
+        // A mid-trip join request in flight overrides the trip's own status —
+        // otherwise a passenger whose seat isn't confirmed yet would see
+        // "Started" and reasonably assume they're already aboard.
+        const myBooking = item.role === 'passenger'
+          ? item.bookings.find((b) => b.passenger.id === user?.id)
+          : undefined;
+        const isRequested = myBooking?.status === 'requested';
+        const tone = isCancelled ? 'red' : isRequested ? 'amber' : STATUS_TONE[item.status] ?? 'grey';
         return (
           <Pressable onPress={() => navigation.navigate('TripDetails', { rideId: item.rideId })}>
             <StatusCard tone={tone} style={isCancelled ? s.cancelledCard : undefined}>
@@ -146,8 +155,8 @@ export default function MyTrips({ navigation }: TabScreenProps<'MyTrips'>) {
                   tone={item.role === 'driver' ? 'green' : 'grey'}
                 />
                 <Badge
-                  text={isCancelled ? 'Cancelled' : STATUS_LABEL[item.status] ?? item.status}
-                  tone={isCancelled ? 'red' : STATUS_TONE[item.status] ?? 'grey'}
+                  text={isCancelled ? 'Cancelled' : isRequested ? 'Requested' : STATUS_LABEL[item.status] ?? item.status}
+                  tone={isCancelled ? 'red' : isRequested ? 'amber' : STATUS_TONE[item.status] ?? 'grey'}
                 />
               </View>
 

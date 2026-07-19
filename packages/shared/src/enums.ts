@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const roleSchema = z.enum(['admin', 'employee']);
 export const vehicleStatusSchema = z.enum(['pending', 'approved', 'inactive']);
 export const rideStatusSchema = z.enum(['published', 'started', 'completed', 'cancelled']);
-export const bookingStatusSchema = z.enum(['booked', 'cancelled', 'completed']);
+export const bookingStatusSchema = z.enum(['requested', 'booked', 'cancelled', 'completed']);
 
 /** PS §5.4 trip lifecycle. Order matters — the state machine indexes into it. */
 export const tripStatusSchema = z.enum([

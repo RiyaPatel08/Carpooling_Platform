@@ -92,14 +92,24 @@ rideRoutes.post(
     // because of, the driver's notification.
     res.status(201).json(booking);
 
-    notify(booking.driverId, {
-      kind: 'booking_created',
-      title: 'New booking',
-      body:
-        `${booking.passengerName} booked ${req.body.seats} seat` +
-        `${req.body.seats > 1 ? 's' : ''} · ${req.body.pickup.label} → ${req.body.drop.label}`,
-      rideId: req.params.id,
-    });
+    const seatWord = `seat${req.body.seats > 1 ? 's' : ''}`;
+    notify(booking.driverId, booking.pending
+      ? {
+          kind: 'booking_requested',
+          title: 'Ride join request',
+          body:
+            `${booking.passengerName} wants to join for ${req.body.seats} ${seatWord} ` +
+            `from ${req.body.pickup.label} — accept or decline from Trip Details.`,
+          rideId: req.params.id,
+        }
+      : {
+          kind: 'booking_created',
+          title: 'New booking',
+          body:
+            `${booking.passengerName} booked ${req.body.seats} ${seatWord} · ` +
+            `${req.body.pickup.label} → ${req.body.drop.label}`,
+          rideId: req.params.id,
+        });
   }),
 );
 
@@ -145,5 +155,32 @@ bookingRoutes.post(
     });
 
     res.json({ ok: true, seatsAvailable: result.seatsAvailable });
+  }),
+);
+
+/** Driver accepts or declines a mid-trip join request. */
+bookingRoutes.post(
+  '/:id/respond',
+  validateParams(z.object({ id: z.string().uuid('Invalid booking id') })),
+  validateBody(z.object({ accept: z.boolean() })),
+  asyncHandler(async (req, res) => {
+    const { sub, orgId } = auth(req);
+    const result = await bookings.respond(req.params.id, sub, orgId, req.body.accept);
+
+    res.json({ ok: true, accepted: result.accepted, seatsAvailable: result.seatsAvailable });
+
+    notify(result.passengerId, result.accepted
+      ? {
+          kind: 'booking_accepted',
+          title: 'Request accepted',
+          body: "The driver accepted your request to join — you're in!",
+          rideId: result.rideId,
+        }
+      : {
+          kind: 'booking_declined',
+          title: 'Request declined',
+          body: 'The driver could not take you on this trip.',
+          rideId: result.rideId,
+        });
   }),
 );

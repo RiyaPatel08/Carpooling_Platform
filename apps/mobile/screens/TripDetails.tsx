@@ -87,7 +87,15 @@ export default function TripDetails({ route, navigation }: ScreenProps<'TripDeta
 
   const tripId = trip.tripId;
   const activeBookings = trip.bookings.filter((b) => b.status !== 'cancelled');
-  const canCancel = !rideCancelled && !isDriver && myBooking?.status === 'booked' && trip.status === 'booked';
+  const confirmedBookings = activeBookings.filter((b) => b.status !== 'requested');
+  const pendingRequests = activeBookings.filter((b) => b.status === 'requested');
+  const isRequested = myBooking?.status === 'requested';
+  // A confirmed booking can only be cancelled before departure; a still-
+  // pending request can be withdrawn any time — it never held a seat, so
+  // there is nothing about the trip's own state to protect.
+  const canCancel =
+    !rideCancelled && !isDriver &&
+    (isRequested || (myBooking?.status === 'booked' && trip.status === 'booked'));
   const canCancelRide = !rideCancelled && isDriver && trip.rideStatus === 'published';
   const canStart = !rideCancelled && !!tripId && isDriver && trip.status === 'booked';
   const canComplete = !!tripId && isDriver && ['started', 'in_progress'].includes(trip.status);
@@ -107,29 +115,42 @@ export default function TripDetails({ route, navigation }: ScreenProps<'TripDeta
   }
 
   function cancelBooking() {
-    Alert.alert('Cancel booking?', 'Your seat will be released back to the driver.', [
-      { text: 'Keep it', style: 'cancel' },
-      {
-        text: 'Cancel booking',
-        style: 'destructive',
-        onPress: async () => {
-          setBusy(true);
-          try {
-            await api(`/bookings/${myBooking!.id}/cancel`, { method: 'POST' });
-            // Leave rather than reload: this ride has just dropped out of
-            // /trips/mine, so staying would only render the "gone" state.
-            goToTab('MyTrips');
-          } catch (e) {
-            Alert.alert(
-              'Could not cancel',
-              e instanceof ApiError ? e.message : 'Please try again',
-            );
-          } finally {
-            setBusy(false);
-          }
+    Alert.alert(
+      isRequested ? 'Withdraw your request?' : 'Cancel booking?',
+      isRequested
+        ? 'The driver will no longer see this request.'
+        : 'Your seat will be released back to the driver.',
+      [
+        { text: 'Keep it', style: 'cancel' },
+        {
+          text: isRequested ? 'Withdraw' : 'Cancel booking',
+          style: 'destructive',
+          onPress: async () => {
+            setBusy(true);
+            try {
+              await api(`/bookings/${myBooking!.id}/cancel`, { method: 'POST' });
+              // Leave rather than reload: this ride has just dropped out of
+              // /trips/mine, so staying would only render the "gone" state.
+              goToTab('MyTrips');
+            } catch (e) {
+              Alert.alert(
+                'Could not cancel',
+                e instanceof ApiError ? e.message : 'Please try again',
+              );
+            } finally {
+              setBusy(false);
+            }
+          },
         },
-      },
-    ]);
+      ],
+    );
+  }
+
+  function respond(bookingId: string, accept: boolean) {
+    act(
+      () => api(`/bookings/${bookingId}/respond`, { method: 'POST', body: JSON.stringify({ accept }) }),
+      accept ? 'Could not accept' : 'Could not decline',
+    );
   }
 
   function cancelRide() {
@@ -150,18 +171,27 @@ export default function TripDetails({ route, navigation }: ScreenProps<'TripDeta
     );
   }
 
-  const phone = isDriver ? activeBookings[0]?.passenger.phone : trip.driver.phone;
-  const counterpart = isDriver ? activeBookings[0]?.passenger : trip.driver;
+  const phone = isDriver ? confirmedBookings[0]?.passenger.phone : trip.driver.phone;
+  const counterpart = isDriver ? confirmedBookings[0]?.passenger : trip.driver;
 
   return (
     <ScrollView contentContainerStyle={s.wrap}>
       <View style={s.head}>
         <Text style={s.title}>Trip Details</Text>
         <Badge
-          text={rideCancelled ? 'Cancelled' : STATUS_LABEL[trip.status] ?? trip.status}
-          tone={rideCancelled ? 'red' : STATUS_TONE[trip.status] ?? 'grey'}
+          text={rideCancelled ? 'Cancelled' : isRequested ? 'Requested' : STATUS_LABEL[trip.status] ?? trip.status}
+          tone={rideCancelled ? 'red' : isRequested ? 'amber' : STATUS_TONE[trip.status] ?? 'grey'}
         />
       </View>
+
+      {isRequested && !rideCancelled && (
+        <View style={s.pendingBanner}>
+          <Ionicons name="time-outline" size={18} color={colors.warning} />
+          <Text style={s.pendingBannerText}>
+            Waiting for the driver to accept your request to join. You'll be notified either way.
+          </Text>
+        </View>
+      )}
 
       {rideCancelled && (
         <View style={s.banner}>
@@ -213,26 +243,64 @@ export default function TripDetails({ route, navigation }: ScreenProps<'TripDeta
       </Card>
 
       {isDriver ? (
-        <Card>
-          <Text style={s.section}>Passengers ({activeBookings.length})</Text>
-          {activeBookings.length === 0 ? (
-            <Empty text="Nobody has booked yet. Your ride is visible to colleagues in search." />
-          ) : (
-            activeBookings.map((b) => (
-              <View key={b.id} style={s.passenger}>
-                <Avatar uri={photoSrc(b.passenger.photoUrl)} name={b.passenger.name} size={36} />
-                <View style={{ flex: 1 }}>
-                  <Text style={s.personName}>{b.passenger.name}</Text>
-                  <Text style={s.meta}>{b.pickupLabel} → {b.dropLabel}</Text>
+        <>
+          {pendingRequests.length > 0 && (
+            <Card style={s.requestCard}>
+              <Text style={s.section}>Join requests ({pendingRequests.length})</Text>
+              {pendingRequests.map((b) => (
+                <View key={b.id} style={s.requestRow}>
+                  <View style={s.passenger}>
+                    <Avatar uri={photoSrc(b.passenger.photoUrl)} name={b.passenger.name} size={36} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.personName}>{b.passenger.name}</Text>
+                      <Text style={s.meta}>{b.pickupLabel} → {b.dropLabel}</Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={s.fare}>₹{b.fareTotal}</Text>
+                      <Text style={s.meta}>{b.seats} seat{b.seats > 1 ? 's' : ''}</Text>
+                    </View>
+                  </View>
+                  <View style={s.requestActions}>
+                    <Button
+                      title="Decline"
+                      variant="secondary"
+                      onPress={() => respond(b.id, false)}
+                      loading={busy}
+                      style={{ flex: 1 }}
+                    />
+                    <Button
+                      title="Accept"
+                      onPress={() => respond(b.id, true)}
+                      loading={busy}
+                      style={{ flex: 1 }}
+                    />
+                  </View>
                 </View>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={s.fare}>₹{b.fareTotal}</Text>
-                  <Text style={s.meta}>{b.seats} seat{b.seats > 1 ? 's' : ''}</Text>
-                </View>
-              </View>
-            ))
+              ))}
+            </Card>
           )}
-        </Card>
+
+          <Card>
+            <Text style={s.section}>Passengers ({confirmedBookings.length})</Text>
+            {confirmedBookings.length === 0 ? (
+              <Empty text="Nobody has booked yet. Your ride is visible to colleagues in search." />
+            ) : (
+              confirmedBookings.map((b) => (
+                <View key={b.id} style={s.passenger}>
+                  <Avatar uri={photoSrc(b.passenger.photoUrl)} name={b.passenger.name} size={36} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.personName}>{b.passenger.name}</Text>
+                    <Text style={s.meta}>{b.pickupLabel} → {b.dropLabel}</Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={s.fare}>₹{b.fareTotal}</Text>
+                    <Text style={s.meta}>{b.seats} seat{b.seats > 1 ? 's' : ''}</Text>
+                  </View>
+                </View>
+              ))
+            )}
+          </Card>
+        </>
       ) : myBooking ? (
         <Card>
           <Text style={s.section}>Your journey</Text>
@@ -342,6 +410,15 @@ const s = StyleSheet.create({
     marginBottom: spacing.md,
   },
   bannerText: { flex: 1, color: colors.danger, fontSize: 13, lineHeight: 19 },
+  pendingBanner: {
+    flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start',
+    backgroundColor: '#FDF3E2', padding: spacing.md, borderRadius: radius.md,
+    marginBottom: spacing.md,
+  },
+  pendingBannerText: { flex: 1, color: colors.warning, fontSize: 13, lineHeight: 19 },
+  requestCard: { borderColor: colors.warning, borderWidth: 1.5 },
+  requestRow: { paddingVertical: 6 },
+  requestActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
   leg: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   legLine: { width: 2, height: 18, backgroundColor: colors.border, marginLeft: 4 },
   dotFrom: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary },

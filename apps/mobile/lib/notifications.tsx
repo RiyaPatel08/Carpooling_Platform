@@ -34,6 +34,9 @@ export const useNotifications = () => useContext(NotificationContext);
 const STYLE: Record<NotificationKind, { icon: keyof typeof Ionicons.glyphMap; tint: string }> = {
   booking_created: { icon: 'person-add', tint: colors.success },
   booking_cancelled: { icon: 'close-circle', tint: colors.warning },
+  booking_requested: { icon: 'hand-left', tint: colors.warning },
+  booking_accepted: { icon: 'checkmark-circle', tint: colors.success },
+  booking_declined: { icon: 'close-circle', tint: colors.danger },
   trip_started: { icon: 'navigate', tint: colors.primary },
   trip_completed: { icon: 'checkmark-done', tint: colors.success },
   payment_received: { icon: 'wallet', tint: colors.success },

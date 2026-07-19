@@ -99,6 +99,9 @@ export const sosSchema = z.object({
 export const notificationKindSchema = z.enum([
   'booking_created',
   'booking_cancelled',
+  'booking_requested',
+  'booking_accepted',
+  'booking_declined',
   'trip_started',
   'trip_completed',
   'payment_received',

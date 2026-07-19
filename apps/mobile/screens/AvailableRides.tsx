@@ -19,6 +19,10 @@ interface Ride {
   farePerSeat: number;
   routeDistanceM: number | null;
   recurrenceRule: string | null;
+  /** 'started' means the driver is already en route — still joinable up to
+   *  wherever they currently are; matched only if they haven't passed this
+   *  pickup point yet, but the seat needs their sign-off, not just seats left. */
+  status: 'published' | 'started' | 'completed' | 'cancelled';
   detourMinutes?: number | null;
   /** Price for the segment this passenger asked for; what they'll be charged. */
   yourFarePerSeat?: number | null;
@@ -50,7 +54,7 @@ export default function AvailableRides({ route, navigation }: ScreenProps<'Avail
   async function book(ride: Ride) {
     setBooking(ride.id);
     try {
-      const res = await api<{ id: string; fareTotal: number; seatsRemaining: number }>(
+      const res = await api<{ id: string; fareTotal: number; seatsRemaining: number; pending: boolean }>(
         `/rides/${ride.id}/book`,
         {
           method: 'POST',
@@ -63,11 +67,19 @@ export default function AvailableRides({ route, navigation }: ScreenProps<'Avail
           }),
         },
       );
-      Alert.alert(
-        'Seat booked',
-        `₹${res.fareTotal} for ${p.seats} seat(s). ${res.seatsRemaining} left on this ride.`,
-        [{ text: 'View My Trips', onPress: () => goToTab('MyTrips') }],
-      );
+      if (res.pending) {
+        Alert.alert(
+          'Request sent',
+          "The driver is already on this trip and needs to confirm you still fit. You'll be notified the moment they respond.",
+          [{ text: 'View My Trips', onPress: () => goToTab('MyTrips') }],
+        );
+      } else {
+        Alert.alert(
+          'Seat booked',
+          `₹${res.fareTotal} for ${p.seats} seat(s). ${res.seatsRemaining} left on this ride.`,
+          [{ text: 'View My Trips', onPress: () => goToTab('MyTrips') }],
+        );
+      }
       void load();
     } catch (e) {
       Alert.alert('Could not book', e instanceof ApiError ? e.message : 'Please try again');
@@ -139,6 +151,7 @@ export default function AvailableRides({ route, navigation }: ScreenProps<'Avail
 
           <View style={s.tags}>
             <Badge text={`${item.seatsAvailable} available`} tone="grey" />
+            {item.status === 'started' && <Badge text="Already en route" tone="amber" />}
             {/* The number endpoint-matching cannot produce. */}
             {typeof item.detourMinutes === 'number' && (
               <Badge
@@ -149,8 +162,15 @@ export default function AvailableRides({ route, navigation }: ScreenProps<'Avail
             {item.recurrenceRule && <Badge text={item.recurrenceRule} tone="grey" />}
           </View>
 
+          {item.status === 'started' && (
+            <Text style={s.pendingNote}>
+              This driver has already left. Requesting a seat needs their OK before it's yours.
+            </Text>
+          )}
+
           <Button
-            title="Book Now"
+            title={item.status === 'started' ? 'Request to Join' : 'Book Now'}
+            variant={item.status === 'started' ? 'secondary' : 'primary'}
             onPress={() => book(item)}
             loading={booking === item.id}
             style={{ marginTop: spacing.sm }}
@@ -178,4 +198,5 @@ const s = StyleSheet.create({
   },
   priceNote: { fontSize: 12, color: colors.success, fontWeight: '600', marginTop: 2 },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  pendingNote: { fontSize: 12, color: colors.textMuted, marginTop: spacing.sm },
 });

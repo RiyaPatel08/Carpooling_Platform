@@ -251,6 +251,14 @@ async function baselineSearch(
  *   the driver going the opposite way down the same road — the case pure
  *   proximity matching gets wrong.
  *
+ * Step 2b (SQL): a ride already 'started' is still searchable, but only up
+ *   to the point the driver has actually reached — mid-trip pickup only
+ *   works ahead of the vehicle. The driver's most recent GPS ping is
+ *   projected onto the same route as the passenger's pickup; if it is
+ *   further along than the pickup point, the driver already drove past
+ *   where this passenger would get on, and the ride is filtered out. No
+ *   ping yet (GPS hasn't reported) is treated as "still at the start".
+ *
  * Step 3 (OSRM, top-N only): re-route the driver via the passenger's pickup
  *   and drop and measure the real added minutes. This is the "+4 min detour"
  *   the demo hangs on, and it is why we cap N — each one is a network call.
@@ -286,8 +294,16 @@ async function corridorSearch(
     CROSS JOIN passenger p
     JOIN users u    ON u.id = r.driver_id
     JOIN vehicles v ON v.id = r.vehicle_id
+    LEFT JOIN LATERAL (
+      SELECT ST_LineLocatePoint(r.route_geom::geometry, tl.pt::geometry) AS frac
+      FROM trips t
+      JOIN trip_locations tl ON tl.trip_id = t.id
+      WHERE t.ride_id = r.id
+      ORDER BY tl.recorded_at DESC
+      LIMIT 1
+    ) driver_pos ON r.status = 'started'
     WHERE r.org_id = ${orgId}
-      AND r.status = 'published'
+      AND r.status IN ('published', 'started')
       AND r.seats_available >= ${q.seats}
       AND r.departure_at BETWEEN ${from} AND ${to}
       AND r.driver_id <> ${userId}
@@ -298,6 +314,12 @@ async function corridorSearch(
       -- Step 2: pickup must come before drop along the route.
       AND ST_LineLocatePoint(r.route_geom::geometry, p.pickup_pt::geometry)
         < ST_LineLocatePoint(r.route_geom::geometry, p.drop_pt::geometry)
+      -- Step 2b: for a started ride, the driver must not have passed pickup.
+      AND (
+        r.status = 'published'
+        OR driver_pos.frac IS NULL
+        OR driver_pos.frac <= ST_LineLocatePoint(r.route_geom::geometry, p.pickup_pt::geometry)
+      )
     ORDER BY r.departure_at ASC
     LIMIT 15
   `;

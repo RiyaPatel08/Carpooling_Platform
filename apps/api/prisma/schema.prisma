@@ -36,6 +36,9 @@ enum RideStatus {
 }
 
 enum BookingStatus {
+  // Mid-trip join request awaiting the driver's accept/decline — see
+  // ride.service.ts's corridorSearch() and booking.service.ts's create().
+  requested
   booked
   cancelled
   completed
