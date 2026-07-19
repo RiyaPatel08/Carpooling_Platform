@@ -60,10 +60,18 @@ export default function TrackRide({ route, navigation }: ScreenProps<'TrackRide'
   // watchPositionAsync was set up, and re-subscribing the watcher every time
   // simulation is toggled is wasteful. A ref stays current without that.
   const simulatingRef = useRef(false);
+  // Same pattern: the trip:status socket handler is set up once at mount and
+  // needs the current booking to redirect to Payment, without re-subscribing
+  // every time the /trips/mine fetch resolves.
+  const tripRef = useRef<TripRow | null>(null);
 
   useEffect(() => {
     simulatingRef.current = simulating;
   }, [simulating]);
+
+  useEffect(() => {
+    tripRef.current = trip;
+  }, [trip]);
 
   // Planned route, drawn once.
   useEffect(() => {
@@ -130,6 +138,16 @@ export default function TrackRide({ route, navigation }: ScreenProps<'TrackRide'
       if (['completed', 'payment_pending', 'payment_completed'].includes(msg.status)) {
         setSimulating(false);
         setAlert(null);
+      }
+      // The moment the driver marks the trip complete, a passenger watching
+      // this exact screen has just seen the vehicle arrive — that is the
+      // point to hand them straight to paying their share, not a screen
+      // showing a finished trip with nothing left to do on it.
+      if (msg.status === 'payment_pending' && !isDriver) {
+        const booking = tripRef.current?.bookings.find((b) => b.passenger.id === user?.id);
+        if (booking) {
+          navigation.navigate('Payment', { bookingId: booking.id, amount: booking.fareTotal });
+        }
       }
     };
 

@@ -1,10 +1,11 @@
 import { useCallback, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Badge, Card, Empty, ErrorNote, Loading } from '../components/ui';
+import { Badge, Empty, ErrorNote, Loading } from '../components/ui';
 import { api, ApiError } from '../lib/api';
-import { colors, spacing } from '../theme';
+import { colors, radius, spacing } from '../theme';
 import type { TabScreenProps } from '../lib/navigation';
 
 export interface TripRow {
@@ -49,6 +50,40 @@ export const STATUS_LABEL: Record<string, string> = {
   payment_pending: 'Payment pending',
   payment_completed: 'Paid',
 };
+
+/**
+ * A soft top-left-to-bottom-right wash per status tone, so the state a trip
+ * is in reads at a glance instead of only from the badge text — the badges
+ * alone (grey text on pale grey, amber on pale amber) turned out too close
+ * in weight to separate quickly in a scrolling list. `booked` stays flat:
+ * it is the default, unremarkable state, and giving it a tint too would
+ * just add noise to the common case.
+ */
+const STATUS_GRADIENT: Record<'green' | 'amber' | 'red' | 'grey', [string, string]> = {
+  green: ['#DFF6EA', colors.surface],
+  amber: ['#FBEDD2', colors.surface],
+  red: ['#FBDEDC', colors.surface],
+  grey: [colors.surface, colors.surface],
+};
+
+function StatusCard({
+  tone, style, children,
+}: {
+  tone: 'green' | 'amber' | 'red' | 'grey';
+  style?: ViewStyle;
+  children: React.ReactNode;
+}) {
+  return (
+    <LinearGradient
+      colors={STATUS_GRADIENT[tone]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 0.6 }}
+      style={[s.card, style]}
+    >
+      {children}
+    </LinearGradient>
+  );
+}
 
 export default function MyTrips({ navigation }: TabScreenProps<'MyTrips'>) {
   const [trips, setTrips] = useState<TripRow[] | null>(null);
@@ -101,9 +136,10 @@ export default function MyTrips({ navigation }: TabScreenProps<'MyTrips'>) {
       renderItem={({ item }) => {
         const isCancelled = item.rideStatus === 'cancelled';
         const seatsBooked = item.seatsTotal - item.seatsAvailable;
+        const tone = isCancelled ? 'red' : STATUS_TONE[item.status] ?? 'grey';
         return (
           <Pressable onPress={() => navigation.navigate('TripDetails', { rideId: item.rideId })}>
-            <Card style={isCancelled ? s.cancelledCard : undefined}>
+            <StatusCard tone={tone} style={isCancelled ? s.cancelledCard : undefined}>
               <View style={s.head}>
                 <Badge
                   text={item.role === 'driver' ? 'Driving' : 'Riding'}
@@ -149,7 +185,7 @@ export default function MyTrips({ navigation }: TabScreenProps<'MyTrips'>) {
                   </Text>
                 </View>
               </View>
-            </Card>
+            </StatusCard>
           </Pressable>
         );
       }}
@@ -160,6 +196,10 @@ export default function MyTrips({ navigation }: TabScreenProps<'MyTrips'>) {
 const s = StyleSheet.create({
   wrap: { padding: spacing.md, backgroundColor: colors.background, flexGrow: 1 },
   title: { fontSize: 24, fontWeight: '700', color: colors.text, marginBottom: spacing.md },
+  card: {
+    borderRadius: radius.lg, padding: spacing.md,
+    borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md,
+  },
   head: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.md },
   cancelledCard: { opacity: 0.72, borderColor: '#F3D4D2' },
   routeRow: { flexDirection: 'row', gap: spacing.sm },

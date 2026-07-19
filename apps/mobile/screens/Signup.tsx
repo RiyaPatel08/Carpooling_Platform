@@ -113,7 +113,7 @@ export default function Signup({ navigation }: ScreenProps<'Signup'>) {
           error={fields.phone}
         />
         <Field
-          label="Email / Mobile"
+          label="Email"
           value={form.email}
           onChangeText={set('email')}
           autoCapitalize="none"
