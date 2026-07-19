@@ -4,7 +4,7 @@ import { prisma } from '../db.js';
 import { badRequest, conflict, forbidden, notFound } from '../lib/errors.js';
 import { routeBetween, routeVia } from '../lib/osrm.js';
 import { pointWkt, lineStringWkt } from '../lib/geo.js';
-import { suggestFare } from './fare.service.js';
+import { suggestFare, bookingFare } from './fare.service.js';
 import { config } from '../config.js';
 
 /**
@@ -34,6 +34,19 @@ export async function publish(
   if (input.seatsTotal > vehicle.seatingCapacity - 1) {
     throw badRequest(
       `Your ${vehicle.model} seats ${vehicle.seatingCapacity}, so you can offer at most ${vehicle.seatingCapacity - 1} seats`,
+    );
+  }
+
+  // One active ride at a time: a driver mid-carpool cannot also be
+  // publishing a second one. They must complete or cancel the first.
+  // chk_one_active_ride_per_driver is the database backstop for this.
+  const activeRide = await prisma.ride.findFirst({
+    where: { driverId, status: { in: ['published', 'started'] } },
+  });
+  if (activeRide) {
+    throw conflict(
+      'You already have an ongoing ride. Complete or cancel it before publishing another.',
+      'ACTIVE_RIDE_EXISTS',
     );
   }
 
@@ -129,6 +142,11 @@ interface RideRow {
 }
 
 function toSummary(r: RideRow, detourMinutes?: number | null, score?: number | null): RideSummary {
+  // Corridor results carry the passenger's position along the route; baseline
+  // results do not, and a baseline match is the whole route by definition.
+  const fraction =
+    r.pickup_frac != null && r.drop_frac != null ? r.drop_frac - r.pickup_frac : 1;
+
   return {
     id: r.id,
     driver: { id: r.driver_id, name: r.driver_name, photoUrl: r.driver_photo },
@@ -145,6 +163,9 @@ function toSummary(r: RideRow, detourMinutes?: number | null, score?: number | n
     status: r.status,
     detourMinutes: detourMinutes ?? null,
     matchScore: score ?? null,
+    // Same function the booking transaction uses, so the quoted price is the
+    // charged price.
+    yourFarePerSeat: bookingFare(Number(r.fare_per_seat), 1, fraction),
   };
 }
 
@@ -329,6 +350,38 @@ export async function getById(rideId: string, orgId: string) {
   });
   if (!ride || ride.orgId !== orgId) throw notFound('Ride not found');
   return ride;
+}
+
+/**
+ * Driver pulls a ride that has not departed yet. The only way to close an
+ * unwanted "published" ride and free the driver up to publish another one —
+ * see the one-active-ride check in publish() above.
+ */
+export async function cancel(
+  rideId: string,
+  driverId: string,
+  orgId: string,
+): Promise<{ passengerIds: string[] }> {
+  return prisma.$transaction(async (tx) => {
+    const ride = await tx.ride.findUnique({
+      where: { id: rideId },
+      include: { bookings: { where: { status: 'booked' }, select: { passengerId: true } } },
+    });
+    if (!ride || ride.orgId !== orgId) throw notFound('Ride not found');
+    if (ride.driverId !== driverId) throw forbidden('You can only cancel your own ride');
+    if (ride.status === 'cancelled') throw conflict('That ride is already cancelled');
+    if (ride.status !== 'published') {
+      throw conflict('This ride has already started and can no longer be cancelled');
+    }
+
+    await tx.ride.update({ where: { id: rideId }, data: { status: 'cancelled' } });
+    await tx.booking.updateMany({
+      where: { rideId, status: 'booked' },
+      data: { status: 'cancelled' },
+    });
+
+    return { passengerIds: ride.bookings.map((b) => b.passengerId) };
+  });
 }
 
 /** Route geometry for drawing a published ride on the map. */

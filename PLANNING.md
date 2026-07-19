@@ -189,6 +189,22 @@ All tables carry `org_id` (except `organizations`). All queries org-scoped via m
 `suggested_fare_per_seat = fare_total / (seats_total + 1)` (driver shares cost).
 Prefilled and editable at publish time.
 
+**Segment-proportional booking fare (mentor review #2).** A passenger matched to
+a *sub-segment* must not pay the whole-route fare — that would make corridor
+matching a worse deal than it is. At booking time:
+
+```
+fraction = ST_LineLocatePoint(route, drop) − ST_LineLocatePoint(route, pickup)
+fare     = fare_per_seat × seats × clamp(fraction, MIN_FARE_FRACTION, 1)
+```
+
+`MIN_FARE_FRACTION = 0.25` is a deliberate floor, not a fudge: the driver still
+detours, stops and rejoins for a 2 km hop, so strict distance-proportional
+pricing would make short legs effectively free and push cost onto whoever rides
+furthest. Every ride-share prices this as a minimum fare. Search results carry
+`yourFarePerSeat` computed by the same function, so the quoted price and the
+charged price cannot diverge.
+
 ---
 
 ## 7. Live Tracking, Chat, Safety
@@ -199,7 +215,20 @@ Prefilled and editable at publish time.
 - Passenger app: animated marker (turf `along` interpolation between pings).
 - **Demo simulator (first-class dev tool, not a hack):** script replays points along the real
   OSRM polyline for a scripted trip → stage-proof demo even if venue GPS/network fails.
+- **In-app trip simulation (`POST /trips/:id/simulate`).** Driver-only. Replays
+  the ride's stored OSRM polyline through `recordPing` — the same function real
+  GPS calls — so ETA, remaining distance, deviation strikes and the
+  `trip_locations` audit trail are all produced by the production path. The
+  demo therefore never depends on venue GPS. `{ deviate: true }` drags the
+  second half off-corridor to fire the safety alert on cue (demo beat 7).
 - Chat: `chat:message` events on same socket, persisted to `messages`, history via REST.
+- **Notifications (per-user socket rooms).** Trip rooms are joined only while a
+  trip screen is open, so they cannot carry "someone booked your ride" — the
+  driver is on the dashboard when that happens. Every socket joins a `user:<id>`
+  room at connect time; `notify()` emits booking created/cancelled, trip
+  started/completed, payment received, chat message and SOS. Rendered as an
+  in-app banner. Still NOT push infra (anti-goal): live-only, nothing persisted,
+  so an event fired while offline is missed.
 - **Route deviation:** server checks each ping's `ST_Distance` to route_geom; > 500 m for 3
   consecutive pings → `safety:alert` to room + row in `safety_events` + admin dashboard flag.
   Passenger sees SOS button. (~30 lines; the intelligence USP.)
@@ -292,3 +321,18 @@ Driver phone (Expo) + passenger phone/emulator + admin web, side by side.
 - [T1] Missing mockup screens added to Kush's lane: Offer Ride (M1), My Vehicle (M2),
   Ride History (M2). These are mandatory-feature UIs, never cut.
 - [T1] Razorpay: client-callback + server signature verify primary; webhook/ngrok = stretch.
+- [T2] **Booking fare is segment-proportional** (§6), with a 25% minimum-fare
+  floor. Flat per-seat pricing contradicted the corridor-matching USP.
+- [T2] **In-app notifications via per-user socket rooms, not push.** Push infra
+  stays an anti-goal; foreground banners cover every demo event.
+- [T2] **Trip simulation promoted to a first-class API endpoint** (§7), not just
+  the CLI script — judges ask to see tracking on a handset.
+- [T2] **Maintenance cost derived from `org.cost_per_km` minus fuel**, rather
+  than adding a maintenance table. Gives the mockup's Revenue / Fuel /
+  Maintenance / Net Profit summary with no migration.
+- [T2] **Mobile charts are plain Views, not a chart library.** A grouped bar
+  chart is rectangles with proportional heights; react-native-svg would be a
+  native dep that breaks Expo Go for no gain.
+- [T2] **Departure time is picked from filtered lists, never typed.** Past times
+  are not offered, so "no past departures" is structural rather than validated
+  after the fact. Also avoids a native date-picker dependency.

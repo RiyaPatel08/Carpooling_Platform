@@ -23,7 +23,14 @@ export async function create(
   passengerId: string,
   orgId: string,
   input: BookingCreateInput,
-): Promise<{ id: string; fareTotal: number; seatsRemaining: number }> {
+): Promise<{
+  id: string;
+  fareTotal: number;
+  seatsRemaining: number;
+  /** Who to tell about this booking. */
+  driverId: string;
+  passengerName: string;
+}> {
   return prisma.$transaction(
     async (tx) => {
       // FOR UPDATE: serialises concurrent bookings on this ride.
@@ -70,14 +77,47 @@ export async function create(
         );
       }
 
-      const existing = await tx.booking.findUnique({
-        where: { rideId_passengerId: { rideId, passengerId } },
-      });
+      const [existing, passenger] = await Promise.all([
+        tx.booking.findUnique({ where: { rideId_passengerId: { rideId, passengerId } } }),
+        tx.user.findUnique({ where: { id: passengerId }, select: { name: true } }),
+      ]);
       if (existing && existing.status === 'booked') {
         throw conflict('You have already booked this ride');
       }
 
-      const fareTotal = bookingFare(Number(ride.fare_per_seat), input.seats);
+      // One active booking at a time: a passenger already riding cannot also
+      // book a second ride. chk_one_active_booking_per_passenger is the
+      // database backstop for this.
+      const activeElsewhere = await tx.booking.findFirst({
+        where: { passengerId, status: 'booked', rideId: { not: rideId } },
+      });
+      if (activeElsewhere) {
+        throw conflict(
+          'You already have an active booking. Cancel it or wait for it to finish before booking another ride.',
+          'ACTIVE_BOOKING_EXISTS',
+        );
+      }
+
+      // How much of the driver's route this passenger actually occupies.
+      // ST_LineLocatePoint projects each end onto the route and returns its
+      // position as a 0..1 fraction of the line, so the difference is the
+      // share of the journey being sold. A ride published before route_geom
+      // was stored yields no row and falls back to the full fare.
+      const [seg] = await tx.$queryRaw<{ fraction: number | null }[]>`
+        SELECT GREATEST(
+                 ST_LineLocatePoint(r.route_geom::geometry, ST_GeogFromText(${pointWkt(input.drop.lat, input.drop.lng)})::geometry)
+               - ST_LineLocatePoint(r.route_geom::geometry, ST_GeogFromText(${pointWkt(input.pickup.lat, input.pickup.lng)})::geometry),
+               0
+               ) AS fraction
+        FROM rides r
+        WHERE r.id = ${rideId} AND r.route_geom IS NOT NULL
+      `;
+
+      const fareTotal = bookingFare(
+        Number(ride.fare_per_seat),
+        input.seats,
+        seg?.fraction ?? 1,
+      );
 
       // Decrement inside the same transaction as the insert. Either both land
       // or neither does.
@@ -106,6 +146,8 @@ export async function create(
           id: existing.id,
           fareTotal,
           seatsRemaining: ride.seats_available - input.seats,
+          driverId: ride.driver_id,
+          passengerName: passenger?.name ?? 'A colleague',
         };
       }
 
@@ -128,6 +170,8 @@ export async function create(
         id: inserted[0].id,
         fareTotal,
         seatsRemaining: ride.seats_available - input.seats,
+        driverId: ride.driver_id,
+        passengerName: passenger?.name ?? 'A colleague',
       };
     },
     // Serializable would also be correct, but the explicit row lock gives the
@@ -146,11 +190,16 @@ export async function cancel(
   bookingId: string,
   userId: string,
   orgId: string,
-): Promise<{ rideId: string; seatsAvailable: number; driverId: string }> {
+): Promise<{
+  rideId: string;
+  seatsAvailable: number;
+  driverId: string;
+  passengerName: string;
+}> {
   return prisma.$transaction(async (tx) => {
     const booking = await tx.booking.findUnique({
       where: { id: bookingId },
-      include: { ride: { include: { trip: true } } },
+      include: { ride: { include: { trip: true } }, passenger: { select: { name: true } } },
     });
     if (!booking || booking.orgId !== orgId) throw notFound('Booking not found');
     if (booking.passengerId !== userId) {
@@ -184,6 +233,7 @@ export async function cancel(
       rideId: booking.rideId,
       seatsAvailable: updated[0].seats_available,
       driverId: booking.ride.driverId,
+      passengerName: booking.passenger.name,
     };
   });
 }

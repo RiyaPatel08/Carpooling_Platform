@@ -98,21 +98,28 @@ export async function update(
   return toVehicle(updated);
 }
 
-export async function remove(vehicleId: string, userId: string): Promise<void> {
+export async function remove(vehicleId: string, userId: string): Promise<{ deleted: boolean }> {
   const vehicle = await prisma.vehicle.findUnique({
     where: { id: vehicleId },
     include: { _count: { select: { rides: true } } },
   });
   if (!vehicle) throw notFound('Vehicle not found');
   if (vehicle.ownerId !== userId) throw forbidden('You can only remove your own vehicles');
+  // Already deactivated: there is nothing left for "Remove" to do, and
+  // silently re-issuing the same update reads to the caller as a no-op.
+  if (vehicle.status === 'inactive') {
+    throw conflict('This vehicle is already inactive');
+  }
 
   // A vehicle attached to rides is part of trip history and cost reports;
-  // deactivate instead so those records keep resolving.
+  // deactivate instead so those records keep resolving. The caller needs to
+  // know which happened — "removed" and "deactivated" read very differently.
   if (vehicle._count.rides > 0) {
     await prisma.vehicle.update({ where: { id: vehicleId }, data: { status: 'inactive' } });
-    return;
+    return { deleted: false };
   }
   await prisma.vehicle.delete({ where: { id: vehicleId } });
+  return { deleted: true };
 }
 
 /** Admin-only approve / deactivate. */

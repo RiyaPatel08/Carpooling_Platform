@@ -55,4 +55,29 @@ describe('bookingFare', () => {
   it('rejects a zero-seat booking', () => {
     expect(() => bookingFare(120, 0)).toThrow();
   });
+
+  it('prices a sub-segment by the share of the route ridden', () => {
+    // Half the corridor costs half the fare.
+    expect(bookingFare(120, 1, 0.5)).toBe(60);
+    expect(bookingFare(120, 2, 0.5)).toBe(120);
+  });
+
+  it('charges the full fare end to end', () => {
+    expect(bookingFare(120, 1, 1)).toBe(120);
+  });
+
+  it('applies the minimum fare floor to very short hops', () => {
+    // 5% of the route still bills at the 25% floor, not Rs 6.
+    expect(bookingFare(120, 1, 0.05)).toBe(30);
+  });
+
+  it('never bills beyond the whole route', () => {
+    // A drop projecting past the end must not invent extra distance.
+    expect(bookingFare(120, 1, 1.4)).toBe(120);
+  });
+
+  it('falls back to the full fare when the route fraction is unknown', () => {
+    expect(bookingFare(120, 1, Number.NaN)).toBe(120);
+    expect(bookingFare(120, 1)).toBe(120);
+  });
 });

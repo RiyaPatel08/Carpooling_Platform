@@ -40,7 +40,6 @@ vehicleRoutes.delete(
   '/:id',
   validateParams(idParam),
   asyncHandler(async (req, res) => {
-    await vehicles.remove(req.params.id, auth(req).sub);
-    res.status(204).end();
+    res.json(await vehicles.remove(req.params.id, auth(req).sub));
   }),
 );

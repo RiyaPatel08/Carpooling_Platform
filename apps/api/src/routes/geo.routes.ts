@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { routeQuerySchema, autocompleteQuerySchema } from '@syncroute/shared';
+import { routeQuerySchema, autocompleteQuerySchema, reverseQuerySchema } from '@syncroute/shared';
 import { validateQuery } from '../middleware/validate.js';
 import { asyncHandler } from '../middleware/error.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -76,5 +76,49 @@ geoRoutes.get(
     });
 
     res.json(results);
+  }),
+);
+
+/**
+ * Reverse geocode: coordinates to a human label.
+ *
+ * Needed by "use my current location" and by dropping a pin on the map — both
+ * produce coordinates, and a booking whose pickup reads "23.0421, 72.5714" is
+ * useless to the driver who has to find the passenger.
+ */
+geoRoutes.get(
+  '/reverse',
+  validateQuery(reverseQuerySchema),
+  asyncHandler(async (req, res) => {
+    const { lat, lng } = req.query as unknown as { lat: number; lng: number };
+
+    let upstream: Response;
+    try {
+      upstream = await fetch(`${config.PHOTON_URL}/reverse?lat=${lat}&lon=${lng}&lang=en`, {
+        signal: AbortSignal.timeout(8_000),
+      });
+    } catch {
+      // A pin without a name is still a usable pin: fall back to coordinates
+      // rather than failing the whole location selection.
+      res.json({ label: `Pinned location (${lat.toFixed(4)}, ${lng.toFixed(4)})`, lat, lng });
+      return;
+    }
+
+    if (!upstream.ok) {
+      res.json({ label: `Pinned location (${lat.toFixed(4)}, ${lng.toFixed(4)})`, lat, lng });
+      return;
+    }
+
+    const body = (await upstream.json()) as {
+      features?: { properties: Record<string, string | undefined> }[];
+    };
+    const p = body.features?.[0]?.properties;
+    const label =
+      [p?.name, p?.street, p?.district, p?.city]
+        .filter(Boolean)
+        .filter((v, i, arr) => arr.indexOf(v) === i)
+        .join(', ') || `Pinned location (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+
+    res.json({ label, lat, lng });
   }),
 );
