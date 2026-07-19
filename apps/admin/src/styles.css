@@ -61,7 +61,7 @@ body {
 .nav-item:hover { background: var(--bg); color: var(--text); }
 .nav-item.active { background: var(--primary-light); color: var(--primary-dark); font-weight: 600; }
 
-.main { flex: 1; padding: 28px 32px; max-width: 1200px; }
+.main { flex: 1; min-width: 0; padding: 28px 32px; max-width: 1200px; }
 .page-title { font-size: 24px; font-weight: 700; margin: 0 0 4px; }
 .page-sub { color: var(--text-muted); margin: 0 0 24px; }
 
@@ -177,3 +177,29 @@ tr:last-child td { border-bottom: none; }
 
 .empty { padding: 40px 20px; text-align: center; color: var(--text-muted); }
 .muted { color: var(--text-muted); font-size: 13px; }
+
+/* --- narrow screens: sidebar becomes a top bar instead of clipping .main --- */
+@media (max-width: 760px) {
+  .shell { flex-direction: column; }
+  .sidebar {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    padding: 10px 16px;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .brand { padding: 0 12px 0 0; }
+  .brand small { display: none; }
+  .sidebar > div:last-child {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+  }
+  .sidebar > div:last-child > .muted { display: none; }
+  .main { padding: 20px 16px; }
+  .page-title { font-size: 20px; }
+}
