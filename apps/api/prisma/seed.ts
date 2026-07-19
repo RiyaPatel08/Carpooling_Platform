@@ -90,6 +90,7 @@ async function main() {
       registeredAddress: 'Gandhinagar, Gujarat',
       industry: 'Software',
       adminContact: 'admin@odoo.com',
+      emailDomain: 'odoo.com',
       fuelCostPerLitre: new Prisma.Decimal(96.5),
       defaultMileageKmpl: new Prisma.Decimal(18),
       costPerKm: new Prisma.Decimal(8.0),
@@ -104,6 +105,7 @@ async function main() {
       registeredAddress: 'Ahmedabad, Gujarat',
       industry: 'IT Services',
       adminContact: 'admin@infobridge.demo',
+      emailDomain: 'infobridge.demo',
       fuelCostPerLitre: new Prisma.Decimal(94.0),
       defaultMileageKmpl: new Prisma.Decimal(16),
       costPerKm: new Prisma.Decimal(7.5),
@@ -299,6 +301,10 @@ async function main() {
     recurrence: 'MO,TU,WE,TH,FR',
   });
 
+  // Krishna gets one active ride, same as every other driver: a driver may
+  // only have one ride published or in progress at a time (see
+  // chk_one_active_ride_per_driver), so a second publishRide() for the same
+  // driver here would fail exactly like it would from the app.
   await publishRide({
     orgId: odoo.id,
     driverId: krishna.id,
@@ -308,17 +314,6 @@ async function main() {
     departureAt: at(20, 0),
     seats: 2,
     fare: 90,
-  });
-
-  await publishRide({
-    orgId: odoo.id,
-    driverId: krishna.id,
-    vehicleId: alto.id,
-    from: PLACES.sgHighway,
-    to: PLACES.gift,
-    departureAt: at(9, 0, 1),
-    seats: 3,
-    fare: 110,
   });
 
   // Same corridor, same evening, different company. This ride must never
