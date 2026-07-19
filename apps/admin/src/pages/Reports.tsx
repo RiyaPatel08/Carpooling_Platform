@@ -39,8 +39,11 @@ interface VehicleRow {
 interface MonthRow {
   month: string;
   trips: number;
+  distanceKm: number;
   revenue: number;
   fuelCost: number;
+  /** Non-fuel share of the org's configured cost per km. */
+  maintenanceCost: number;
   netProfit: number;
   co2SavedKg: number;
 }
@@ -76,7 +79,7 @@ export default function Reports() {
       {/* Two measures, one rupee scale — grouped, never a second y-axis. */}
       <div className="card">
         <div className="card-head">
-          <span className="card-title">Revenue vs fuel cost by month</span>
+          <span className="card-title">Revenue vs running cost by month</span>
         </div>
         <div className="card-body">
           {monthly.data && monthly.data.length > 0 ? (
@@ -91,8 +94,9 @@ export default function Reports() {
                   cursor={{ fill: 'rgba(18,33,29,0.04)' }}
                 />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 13 }} />
-                <Bar dataKey="revenue" name="Fares collected" fill={SERIES_1} radius={[4, 4, 0, 0]} maxBarSize={28} />
-                <Bar dataKey="fuelCost" name="Fuel cost" fill={SERIES_2} radius={[4, 4, 0, 0]} maxBarSize={28} />
+                <Bar dataKey="revenue" name="Fares collected" fill={SERIES_1} radius={[4, 4, 0, 0]} maxBarSize={24} />
+                <Bar dataKey="fuelCost" name="Fuel cost" fill={SERIES_2} radius={[4, 4, 0, 0]} maxBarSize={24} />
+                <Bar dataKey="maintenanceCost" name="Maintenance" fill={AXIS} radius={[4, 4, 0, 0]} maxBarSize={24} />
               </BarChart>
             </ResponsiveContainer>
           ) : (
@@ -144,19 +148,22 @@ export default function Reports() {
           <table style={{ fontVariantNumeric: 'tabular-nums' }}>
             <thead>
               <tr>
-                <th>Month</th><th>Trips</th><th>Fares</th><th>Fuel Cost</th><th>Net</th><th>CO₂ Avoided</th>
+                <th>Month</th><th>Trips</th><th>Distance</th><th>Revenue</th>
+                <th>Fuel Cost</th><th>Maintenance</th><th>Net Profit</th><th>CO₂ Avoided</th>
               </tr>
             </thead>
             <tbody>
               {monthly.data?.length === 0 && (
-                <tr><td colSpan={6} className="empty">No completed trips yet.</td></tr>
+                <tr><td colSpan={8} className="empty">No completed trips yet.</td></tr>
               )}
               {monthly.data?.map((m) => (
                 <tr key={m.month}>
                   <td>{m.month}</td>
                   <td>{m.trips}</td>
+                  <td>{m.distanceKm.toFixed(0)} km</td>
                   <td>{rupee(m.revenue)}</td>
                   <td>{rupee(m.fuelCost)}</td>
+                  <td>{rupee(m.maintenanceCost)}</td>
                   <td style={{ color: m.netProfit >= 0 ? '#006300' : 'var(--danger)' }}>
                     {rupee(m.netProfit)}
                   </td>

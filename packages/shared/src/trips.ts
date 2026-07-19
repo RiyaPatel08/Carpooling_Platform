@@ -84,6 +84,40 @@ export const sosSchema = z.object({
   lng: z.number().min(-180).max(180).optional(),
 });
 
+/**
+ * In-app notification.
+ *
+ * Delivered to a per-user socket room, so a driver hears about a booking
+ * without having any trip screen open. Deliberately NOT push notifications:
+ * PLANNING lists push infra as an anti-goal, and every event that matters
+ * during a demo happens while the app is in the foreground.
+ *
+ * ponytail: live-only, nothing persisted, so an event fired while the user is
+ * offline is missed. Add a notifications table + GET /notifications if a
+ * missed booking alert ever costs someone a seat.
+ */
+export const notificationKindSchema = z.enum([
+  'booking_created',
+  'booking_cancelled',
+  'trip_started',
+  'trip_completed',
+  'payment_received',
+  'chat_message',
+  'safety_alert',
+]);
+export type NotificationKind = z.infer<typeof notificationKindSchema>;
+
+export const notificationSchema = z.object({
+  kind: notificationKindSchema,
+  title: z.string(),
+  body: z.string(),
+  /** Where tapping the notification should take the user. */
+  tripId: z.string().uuid().nullable().optional(),
+  rideId: z.string().uuid().nullable().optional(),
+  createdAt: z.string(),
+});
+export type Notification = z.infer<typeof notificationSchema>;
+
 export const SOCKET_EVENTS = {
   joinTrip: 'trip:join',
   leaveTrip: 'trip:leave',
@@ -93,4 +127,5 @@ export const SOCKET_EVENTS = {
   tripStatus: 'trip:status',
   safetyAlert: 'safety:alert',
   sos: 'safety:sos',
+  notification: 'notify',
 } as const;

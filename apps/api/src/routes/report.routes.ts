@@ -34,3 +34,12 @@ reportRoutes.get(
     res.json(await reports.monthly(auth(req).orgId));
   }),
 );
+
+/** Mobile Reports screen: this employee's own month, not the org's. */
+reportRoutes.get(
+  '/mine/monthly',
+  asyncHandler(async (req, res) => {
+    const { sub, orgId } = auth(req);
+    res.json(await reports.userMonthly(sub, orgId));
+  }),
+);

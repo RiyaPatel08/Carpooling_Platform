@@ -45,10 +45,46 @@ export const monthlyReportSchema = z.array(
   z.object({
     month: z.string(),
     trips: z.number(),
+    distanceKm: z.number(),
+    /** Fares passengers actually paid. */
     revenue: z.number(),
     fuelCost: z.number(),
+    /**
+     * Wear, servicing and tyres. Derived as the non-fuel part of the org's
+     * configured cost-per-km, so it moves with distance driven and needs no
+     * separate data entry.
+     */
+    maintenanceCost: z.number(),
+    /** revenue − (fuel + maintenance). */
     netProfit: z.number(),
     co2SavedKg: z.number(),
   }),
 );
 export type MonthlyReport = z.infer<typeof monthlyReportSchema>;
+
+/**
+ * The mobile app's Reports screen: one employee's own month, not the org's.
+ * Org-wide numbers stay on the admin web app's Reports tab; this is "what
+ * did carpooling cost or earn ME this month," split by the two roles the
+ * same person can play across different rides.
+ */
+export const userMonthlyReportSchema = z.array(
+  z.object({
+    month: z.string(),
+    tripsAsDriver: z.number(),
+    tripsAsPassenger: z.number(),
+    distanceKm: z.number(),
+    /** What driving your own rides cost: fuel plus the non-fuel share of
+     *  the org's configured cost-per-km, same convention as the org report. */
+    fuelCost: z.number(),
+    maintenanceCost: z.number(),
+    /** Fares your passengers paid you, as a driver. */
+    earnings: z.number(),
+    /** Fares you paid, as a passenger. */
+    fareSpent: z.number(),
+    /** earnings − fuelCost − maintenanceCost − fareSpent: your personal cash flow. */
+    netAmount: z.number(),
+    co2SavedKg: z.number(),
+  }),
+);
+export type UserMonthlyReport = z.infer<typeof userMonthlyReportSchema>;

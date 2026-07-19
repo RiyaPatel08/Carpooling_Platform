@@ -93,5 +93,12 @@ export const rideSummarySchema = z.object({
    */
   detourMinutes: z.number().nullable().optional(),
   matchScore: z.number().nullable().optional(),
+  /**
+   * Per-seat price for the sub-segment THIS passenger asked for, which is what
+   * they will actually be charged. Equals farePerSeat on a whole-route match;
+   * lower on a mid-corridor hop. Shown instead of farePerSeat so the search
+   * result and the booking confirmation never disagree.
+   */
+  yourFarePerSeat: z.number().nullable().optional(),
 });
 export type RideSummary = z.infer<typeof rideSummarySchema>;
